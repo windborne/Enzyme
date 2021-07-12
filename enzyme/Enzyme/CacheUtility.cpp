@@ -737,6 +737,7 @@ AllocaInst *CacheUtility::createCacheForScope(LimitContext ctx, Type *T,
         }
         Value *es = unwrapM(extraSize, allocationBuilder, available,
                             UnwrapMode::AttemptFullUnwrapWithLookup);
+
         assert(es);
         size = allocationBuilder.CreateMul(size, es, "", /*NUW*/ true,
                                            /*NSW*/ true);
