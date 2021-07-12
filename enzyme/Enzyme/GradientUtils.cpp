@@ -1027,7 +1027,7 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
             BuilderM.SetInsertPoint(bret);
             reverseBlocks[fwd].push_back(bret);
             reverseBlockToPrimal[bret] = fwd;
-            auto toret = BuilderM.CreatePHI(val->getType(), vals.size());
+            auto toret = BuilderM.CreatePHI(val->getType(), vals.size(), phi->getName() + "_unwrap");
             for (size_t i = 0; i < vals.size(); i++)
               toret->addIncoming(vals[i], endingBlocks[i]);
             assert(val->getType() == toret->getType());
@@ -1227,7 +1227,7 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
       BuilderM.SetInsertPoint(bret);
       reverseBlocks[fwd].push_back(bret);
       reverseBlockToPrimal[bret] = fwd;
-      auto toret = BuilderM.CreatePHI(val->getType(), vals.size());
+      auto toret = BuilderM.CreatePHI(val->getType(), vals.size(), phi->getName()+"_unwrap");
       for (size_t i = 0; i < vals.size(); i++)
         toret->addIncoming(vals[i], endingBlocks[i]);
       assert(val->getType() == toret->getType());
