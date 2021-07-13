@@ -6165,6 +6165,8 @@ public:
         return;
       }
 
+      hasPDFree = true;
+
       // TODO enable this if we need to free the memory
       // NOTE THAT TOPLEVEL IS THERE SIMPLY BECAUSE THAT WAS PREVIOUS ATTITUTE
       // TO FREE'ing
