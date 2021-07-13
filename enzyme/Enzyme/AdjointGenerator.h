@@ -5750,11 +5750,11 @@ public:
         if ((is_value_needed_in_reverse<ValueType::Primal>(
                  TR, gutils, orig, Mode, oldUnreachable) &&
              !gutils->unnecessaryIntermediates.count(orig)) ||
-            hasMetadata(orig, "enzyme_fromstack")) {
+            hasMetadata(orig, "enzyme_fromstack") || true) {
           Value *nop = gutils->cacheForReverse(BuilderZ, newCall,
                                                getIndex(orig, CacheType::Self));
           if (Mode == DerivativeMode::ReverseModeGradient &&
-              hasMetadata(orig, "enzyme_fromstack")) {
+              (hasMetadata(orig, "enzyme_fromstack") || true)) {
             IRBuilder<> Builder2(call.getParent());
             getReverseBuilder(Builder2);
             freeKnownAllocation(Builder2, lookup(nop, Builder2), *called,
