@@ -931,10 +931,17 @@ Function *PreProcessCache::preprocessForClone(Function *F,
     }
   }
 
+<<<<<<< HEAD
   {
     SimplifyMPIQueries(*NewF);
     PreservedAnalyses PA;
     FAM.invalidate(*NewF, PA);
+=======
+  if (true) {
+  SimplifyMPIQueries(*NewF);
+  PreservedAnalyses PA;
+  FAM.invalidate(*NewF, PA);
+>>>>>>> MPI Wait corrections
   }
 
   if (EnzymeLowerGlobals) {
