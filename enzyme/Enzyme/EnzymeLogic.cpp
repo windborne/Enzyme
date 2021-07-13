@@ -484,6 +484,10 @@ struct CacheAnalysis {
     if (isCertainPrintMallocOrFree(Fn)) {
       return {};
     }
+
+    if (callsite_op->getCalledFunction()->getName().startswith("MPI_") || callsite_op->getCalledFunction()->getName().startswith("enzyme_wrapmpi$$"))
+      return {};
+
     std::vector<Value *> args;
     std::vector<bool> args_safe;
 
