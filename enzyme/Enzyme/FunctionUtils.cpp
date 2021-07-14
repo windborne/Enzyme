@@ -682,6 +682,12 @@ static void SimplifyMPIQueries(Function &NewF) {
             Fn->getName() == "__kmpc_for_static_init_8u") {
           OMPBounds.push_back(CI);
         }
+        if (Fn->getName() == "__kmpc_for_static_init_4" ||
+            Fn->getName() == "__kmpc_for_static_init_4u" ||
+            Fn->getName() == "__kmpc_for_static_init_8" ||
+            Fn->getName() == "__kmpc_for_static_init_8u") {
+            OMPBounds = CI;
+        }
       }
     }
   }
@@ -931,17 +937,10 @@ Function *PreProcessCache::preprocessForClone(Function *F,
     }
   }
 
-<<<<<<< HEAD
   {
-    SimplifyMPIQueries(*NewF);
-    PreservedAnalyses PA;
-    FAM.invalidate(*NewF, PA);
-=======
-  if (true) {
   SimplifyMPIQueries(*NewF);
   PreservedAnalyses PA;
   FAM.invalidate(*NewF, PA);
->>>>>>> MPI Wait corrections
   }
 
   if (EnzymeLowerGlobals) {

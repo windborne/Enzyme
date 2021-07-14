@@ -623,7 +623,10 @@ public:
               F->getName() == "__kmpc_for_static_init_4u" ||
               F->getName() == "__kmpc_for_static_init_8" ||
               F->getName() == "__kmpc_for_static_init_8u") {
-            return;
+            if (gutils->OrigDT.dominates(&SI, CI))
+                return;
+            else
+                assert(gutils->OrigDT.dominates(CI, &SI));
           }
         }
       }

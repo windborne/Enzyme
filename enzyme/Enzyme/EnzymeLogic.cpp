@@ -259,6 +259,12 @@ struct CacheAnalysis {
       return false;
     }
 
+    if (kmpcCall) {
+        if (OrigDT.dominates(&li, kmpcCall)) {
+            return false;
+        }
+    }
+
     // Find the underlying object for the pointer operand of the load
     // instruction.
     auto obj =
@@ -2976,6 +2982,38 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
       unnecessaryValues, unnecessaryInstructions, unnecessaryStores,
       guaranteedUnreachable, dretAlloca);
 
+  /*
+  if (mode != DerivativeMode::ReverseModeCombined &&
+      mode != DerivativeMode::ForwardMode) {
+    std::map<Value *, std::vector<Value *>> unwrapToOrig;
+    for (auto pair : gutils->unwrappedLoads)
+      unwrapToOrig[pair.second].push_back(const_cast<Value *>(pair.first));
+    std::map<Value *, Value *> newIToNextI;
+    for (const auto &m : mapping) {
+      if (m.first.second == CacheType::Self && !isa<LoadInst>(m.first.first) &&
+          !isa<CallInst>(m.first.first)) {
+        auto newi = gutils->getNewFromOriginal(m.first.first);
+        if (auto PN = dyn_cast<PHINode>(newi))
+          if (gutils->fictiousPHIs.count(PN))
+            gutils->fictiousPHIs.erase(PN);
+        IRBuilder<> BuilderZ(newi->getNextNode());
+        if (isa<PHINode>(m.first.first)) {
+          BuilderZ.SetInsertPoint(
+              cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+        }
+        Value *nexti = gutils->cacheForReverse(BuilderZ, newi, m.second);
+        for (auto V : unwrapToOrig[newi]) {
+          ValueToValueMapTy empty;
+          IRBuilder<> lb(cast<Instruction>(V));
+          V->replaceAllUsesWith(
+              gutils->unwrapM(nexti, lb, empty, UnwrapMode::LegalFullUnwrap));
+          cast<Instruction>(V)->eraseFromParent();
+        }
+      }
+    }
+  }
+  */
+
   for (BasicBlock &oBB : *gutils->oldFunc) {
     // Don't create derivatives for code that results in termination
     if (guaranteedUnreachable.find(&oBB) != guaranteedUnreachable.end()) {
@@ -3143,6 +3181,7 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
           ++UI;
           U.set(repVal);
         }
+        
       }
     }
   }

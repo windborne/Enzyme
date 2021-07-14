@@ -4000,6 +4000,12 @@ Value *GradientUtils::lookupM(Value *val, IRBuilder<> &BuilderM,
                 "Caching instruction ", *inst, " legalRecompute: ", lrc,
                 " shouldRecompute: ", src,
                 " tryLegalRecomputeCheck: ", tryLegalRecomputeCheck);
+  if (inst->getName().startswith("_replacementA")) {
+      llvm::errs() << "oldFunc: " << *oldFunc << "\n";
+      llvm::errs() << "newFunc: " << *newFunc << "\n";
+      llvm::errs() << "inst: " << *inst << "\n";
+  }
+  assert(!inst->getName().startswith("_replacementA"));
   ensureLookupCached(inst);
   bool isi1 = inst->getType()->isIntegerTy() &&
               cast<IntegerType>(inst->getType())->getBitWidth() == 1;
@@ -4677,6 +4683,7 @@ void GradientUtils::computeMinCache(
 
     for (auto V : Intermediates) {
       knownRecomputeHeuristic[V] = !MinReq.count(V);
+      llvm::errs() << " calc int: " << *V << " minreq: " << MinReq.count(V) << " needgraph: " << NeedGraph.count(V) << " recomputes: " << Recomputes.count(V) << "\n";
       if (!NeedGraph.count(V)) {
         unnecessaryIntermediates.insert(cast<Instruction>(V));
       }
