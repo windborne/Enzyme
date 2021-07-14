@@ -96,6 +96,7 @@ struct CacheAnalysis {
   const std::map<Argument *, bool> &uncacheable_args;
   DerivativeMode mode;
   std::map<Value *, bool> seen;
+  CallInst* kmpcCall;
   CacheAnalysis(
       AAResults &AA, Function *oldFunc, ScalarEvolution &SE, LoopInfo &OrigLI,
       DominatorTree &OrigDT, TargetLibraryInfo &TLI,
@@ -103,7 +104,21 @@ struct CacheAnalysis {
       const std::map<Argument *, bool> &uncacheable_args, DerivativeMode mode)
       : AA(AA), oldFunc(oldFunc), SE(SE), OrigLI(OrigLI), OrigDT(OrigDT),
         TLI(TLI), unnecessaryInstructions(unnecessaryInstructions),
-        uncacheable_args(uncacheable_args), mode(mode) {}
+        uncacheable_args(uncacheable_args), mode(mode), kmpcCall(nullptr) {
+
+    for (auto &BB : *oldFunc)
+        for (auto &I : BB)
+          if (auto CI = dyn_cast<CallInst>(&I)) {
+            if (auto F = CI->getCalledFunction()) {
+              if (F->getName() == "__kmpc_for_static_init_4" ||
+                  F->getName() == "__kmpc_for_static_init_4u" ||
+                  F->getName() == "__kmpc_for_static_init_8" ||
+                  F->getName() == "__kmpc_for_static_init_8u") {
+                kmpcCall = CI;
+              }
+            }
+          }
+  }
 
   bool is_value_mustcache_from_origin(Value *obj) {
     if (seen.find(obj) != seen.end())
@@ -233,6 +248,12 @@ struct CacheAnalysis {
       return false;
     }
 
+    if (kmpcCall) {
+        if (OrigDT.dominates(&li, kmpcCall)) {
+            return false;
+        }
+    }
+
     // Find the underlying object for the pointer operand of the load
     // instruction.
     auto obj =
@@ -256,6 +277,13 @@ struct CacheAnalysis {
 
         if (!writesToMemoryReadBy(AA, &li, inst2)) {
           return false;
+        }
+        if (auto CI = dyn_cast<CallInst>(inst2)) {
+          if (auto F = CI->getCalledFunction()) {
+            if (F->getName() == "__kmpc_for_static_fini") {
+              return false;
+            }
+          }
         }
 
         if (auto SI = dyn_cast<StoreInst>(inst2)) {
@@ -485,8 +513,15 @@ struct CacheAnalysis {
       return {};
     }
 
-    if (callsite_op->getCalledFunction()->getName().startswith("MPI_") || callsite_op->getCalledFunction()->getName().startswith("enzyme_wrapmpi$$"))
+    if (Fn->getName().startswith("MPI_") || Fn->getName().startswith("enzyme_wrapmpi$$"))
       return {};
+
+    if (Fn->getName() == "__kmpc_for_static_init_4" ||
+        Fn->getName() == "__kmpc_for_static_init_4u" ||
+        Fn->getName() == "__kmpc_for_static_init_8" ||
+        Fn->getName() == "__kmpc_for_static_init_8u") {
+      return {};
+    }
 
     std::vector<Value *> args;
     std::vector<bool> args_safe;
@@ -509,7 +544,7 @@ struct CacheAnalysis {
 #endif
 
       bool init_safe = !is_value_mustcache_from_origin(obj);
-      if (!init_safe) {
+      if (!init_safe && !isa<ConstantInt>(obj) &&!isa<Function>(obj)) {
         EmitWarning("UncacheableOrigin", callsite_op->getDebugLoc(), oldFunc,
                     callsite_op->getParent(), "Callsite ", *callsite_op,
                     " arg ", i, " ", *callsite_op->getArgOperand(i),
@@ -543,6 +578,9 @@ struct CacheAnalysis {
         if (called && isMemFreeLibMFunction(called->getName())) {
           return false;
         }
+        if (called && called->getName() == "__kmpc_for_static_fini") {
+          return false;
+        }
 
 #if LLVM_VERSION_MAJOR >= 11
         if (auto iasm = dyn_cast<InlineAsm>(obj_op->getCalledOperand()))
@@ -564,6 +602,7 @@ struct CacheAnalysis {
       for (unsigned i = 0; i < args.size(); ++i) {
         if (llvm::isModSet(AA.getModRefInfo(
                 inst2, MemoryLocation::getForArgument(callsite_op, i, TLI)))) {
+          if (!isa<ConstantInt>(callsite_op->getArgOperand(i)))
           EmitWarning("UncacheableArg", callsite_op->getDebugLoc(), oldFunc,
                       callsite_op->getParent(), "Callsite ", *callsite_op,
                       " arg ", i, " ", *callsite_op->getArgOperand(i),
@@ -2926,6 +2965,38 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
       unnecessaryValues, unnecessaryInstructions, unnecessaryStores,
       guaranteedUnreachable, dretAlloca);
 
+  /*
+  if (mode != DerivativeMode::ReverseModeCombined &&
+      mode != DerivativeMode::ForwardMode) {
+    std::map<Value *, std::vector<Value *>> unwrapToOrig;
+    for (auto pair : gutils->unwrappedLoads)
+      unwrapToOrig[pair.second].push_back(const_cast<Value *>(pair.first));
+    std::map<Value *, Value *> newIToNextI;
+    for (const auto &m : mapping) {
+      if (m.first.second == CacheType::Self && !isa<LoadInst>(m.first.first) &&
+          !isa<CallInst>(m.first.first)) {
+        auto newi = gutils->getNewFromOriginal(m.first.first);
+        if (auto PN = dyn_cast<PHINode>(newi))
+          if (gutils->fictiousPHIs.count(PN))
+            gutils->fictiousPHIs.erase(PN);
+        IRBuilder<> BuilderZ(newi->getNextNode());
+        if (isa<PHINode>(m.first.first)) {
+          BuilderZ.SetInsertPoint(
+              cast<Instruction>(newi)->getParent()->getFirstNonPHI());
+        }
+        Value *nexti = gutils->cacheForReverse(BuilderZ, newi, m.second);
+        for (auto V : unwrapToOrig[newi]) {
+          ValueToValueMapTy empty;
+          IRBuilder<> lb(cast<Instruction>(V));
+          V->replaceAllUsesWith(
+              gutils->unwrapM(nexti, lb, empty, UnwrapMode::LegalFullUnwrap));
+          cast<Instruction>(V)->eraseFromParent();
+        }
+      }
+    }
+  }
+  */
+
   for (BasicBlock &oBB : *gutils->oldFunc) {
     // Don't create derivatives for code that results in termination
     if (guaranteedUnreachable.find(&oBB) != guaranteedUnreachable.end()) {
@@ -3084,6 +3155,7 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
           ++UI;
           U.set(repVal);
         }
+        
       }
     }
   }

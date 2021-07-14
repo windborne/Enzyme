@@ -54,7 +54,24 @@ static inline bool is_use_directly_needed_in_reverse(
 
   // We don't need any of the input operands to compute the adjoint of a store
   // instance
-  if (isa<StoreInst>(user)) {
+  if (auto SI = dyn_cast<StoreInst>(user)) {
+    if (SI->getValueOperand() == val) {
+        for (auto U : SI->getPointerOperand()->users()) {
+          if (auto CI = dyn_cast<CallInst>(U)) {
+            if (auto F = CI->getCalledFunction()) {
+              if (F->getName() == "__kmpc_for_static_init_4" ||
+                  F->getName() == "__kmpc_for_static_init_4u" ||
+                  F->getName() == "__kmpc_for_static_init_8" ||
+                  F->getName() == "__kmpc_for_static_init_8u") {
+                if (gutils->OrigDT.dominates(SI, CI))
+                    return true;
+                else
+                    assert(gutils->OrigDT.dominates(CI, SI));
+              }
+            }
+          }
+        }
+    }
     return false;
   }
 

@@ -421,6 +421,11 @@ public:
       assert(arg->getParent() == newFunc);
     }
     if (auto inst = dyn_cast<Instruction>(newinst)) {
+      if (inst->getParent()->getParent() != newFunc) {
+          llvm::errs() << "newFunc: " << *newFunc << "\n";
+          llvm::errs() << "instParent: " << *inst->getParent()->getParent() << "\n";
+          llvm::errs() << "inst: " << *inst << "\n";
+      }
       assert(inst->getParent()->getParent() == newFunc);
     }
     for (auto v : originalToNewFn) {
@@ -891,7 +896,6 @@ public:
       pp->replaceAllUsesWith(UndefValue::get(pp->getType()));
       erase(pp);
     }
-    fictiousPHIs.clear();
   }
 
   TypeResults *my_TR;

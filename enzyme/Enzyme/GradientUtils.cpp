@@ -545,7 +545,7 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
 
     bool legalMove = mode == UnwrapMode::LegalFullUnwrap ||
                      mode == UnwrapMode::LegalFullUnwrapNoTapeReplace;
-    if (mode != UnwrapMode::LegalFullUnwrap) {
+    if (!legalMove) {
       BasicBlock *parent = nullptr;
       if (isOriginalBlock(*BuilderM.GetInsertBlock()))
         parent = BuilderM.GetInsertBlock();
@@ -590,7 +590,8 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
     toreturn->setVolatile(load->isVolatile());
     toreturn->setOrdering(load->getOrdering());
     toreturn->setSyncScopeID(load->getSyncScopeID());
-    toreturn->setDebugLoc(getNewFromOriginal(load->getDebugLoc()));
+    if (toreturn->getParent()->getParent() == load->getParent()->getParent())
+      toreturn->setDebugLoc(getNewFromOriginal(load->getDebugLoc()));
     toreturn->setMetadata(LLVMContext::MD_tbaa,
                           load->getMetadata(LLVMContext::MD_tbaa));
     toreturn->setMetadata(LLVMContext::MD_invariant_group,
@@ -604,7 +605,7 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
 
     bool legalMove = mode == UnwrapMode::LegalFullUnwrap ||
                      mode == UnwrapMode::LegalFullUnwrapNoTapeReplace;
-    if (mode != UnwrapMode::LegalFullUnwrap) {
+    if (!legalMove) {
       legalMove = legalRecompute(op, available, &BuilderM);
     }
     if (!legalMove)
@@ -649,7 +650,7 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
 
         bool legalMove = mode == UnwrapMode::LegalFullUnwrap ||
                          mode == UnwrapMode::LegalFullUnwrapNoTapeReplace;
-        if (mode != UnwrapMode::LegalFullUnwrap) {
+        if (!legalMove) {
           // TODO actually consider whether this is legal to move to the new
           // location, rather than recomputable anywhere
           legalMove = legalRecompute(dli, available, &BuilderM);
@@ -1869,13 +1870,30 @@ bool GradientUtils::legalRecompute(const Value *val,
     const Instruction *orig = nullptr;
     if (li->getParent()->getParent() == oldFunc) {
       orig = li;
-    } else {
+    } else if (li->getParent()->getParent() == newFunc) {
       orig = isOriginal(li);
       // todo consider when we pass non original queries
       if (orig && !isa<LoadInst>(orig)) {
         return legalRecompute(orig, available, BuilderM, reverse,
                               legalRecomputeCache);
       }
+    } else {
+
+        auto &MDT = Logic.PPC.FAM.getResult<DominatorTreeAnalysis>(*const_cast<Function*>(li->getParent()->getParent()));
+        for (auto &BB : *li->getParent()->getParent())
+            for (auto &I : BB)
+              if (auto CI = dyn_cast<CallInst>(&I)) {
+                if (auto F = CI->getCalledFunction()) {
+                  if (F->getName() == "__kmpc_for_static_init_4" ||
+                      F->getName() == "__kmpc_for_static_init_4u" ||
+                      F->getName() == "__kmpc_for_static_init_8" ||
+                      F->getName() == "__kmpc_for_static_init_8u") {
+                    if (MDT.dominates(li, CI))
+                        return true;
+                  }
+                }
+              }
+        assert(0 && "illegal diff function call");
     }
 
     if (orig) {
@@ -3906,6 +3924,12 @@ Value *GradientUtils::lookupM(Value *val, IRBuilder<> &BuilderM,
                 "Caching instruction ", *inst, " legalRecompute: ", lrc,
                 " shouldRecompute: ", src,
                 " tryLegalRecomputeCheck: ", tryLegalRecomputeCheck);
+  if (inst->getName().startswith("_replacementA")) {
+      llvm::errs() << "oldFunc: " << *oldFunc << "\n";
+      llvm::errs() << "newFunc: " << *newFunc << "\n";
+      llvm::errs() << "inst: " << *inst << "\n";
+  }
+  assert(!inst->getName().startswith("_replacementA"));
   ensureLookupCached(inst);
   bool isi1 = inst->getType()->isIntegerTy() &&
               cast<IntegerType>(inst->getType())->getBitWidth() == 1;
@@ -4583,6 +4607,7 @@ void GradientUtils::computeMinCache(
 
     for (auto V : Intermediates) {
       knownRecomputeHeuristic[V] = !MinReq.count(V);
+      llvm::errs() << " calc int: " << *V << " minreq: " << MinReq.count(V) << " needgraph: " << NeedGraph.count(V) << " recomputes: " << Recomputes.count(V) << "\n";
       if (!NeedGraph.count(V)) {
         unnecessaryIntermediates.insert(cast<Instruction>(V));
       }

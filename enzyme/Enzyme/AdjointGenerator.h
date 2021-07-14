@@ -576,7 +576,10 @@ public:
               F->getName() == "__kmpc_for_static_init_4u" ||
               F->getName() == "__kmpc_for_static_init_8" ||
               F->getName() == "__kmpc_for_static_init_8u") {
-            return;
+            if (gutils->OrigDT.dominates(&SI, CI))
+                return;
+            else
+                assert(gutils->OrigDT.dominates(CI, &SI));
           }
         }
       }
@@ -2823,6 +2826,8 @@ public:
         assert(whatType(argType, Mode) == DIFFE_TYPE::DUP_ARG ||
                whatType(argType, Mode) == DIFFE_TYPE::CONSTANT);
       } else {
+        llvm::errs() << " called: " << *called << "\n";
+        llvm::errs() << "call: " << call << "\n";
         assert(0 && "out for omp not handled");
         argsInverted.push_back(DIFFE_TYPE::OUT_DIFF);
         assert(whatType(argType, Mode) == DIFFE_TYPE::OUT_DIFF ||
@@ -2908,7 +2913,6 @@ public:
             subdata->returns.end()) {
           ValueToValueMapTy VMap;
           newcalled = CloneFunction(newcalled, VMap);
-          llvm::errs() << *newcalled << "\n";
           auto tapeArg = newcalled->arg_end();
           tapeArg--;
           std::vector<std::pair<ssize_t, Value *>> geps;
@@ -2929,11 +2933,14 @@ public:
               for (auto SI : storesToErase)
                 SI->eraseFromParent();
               gepsToErase.insert(gep);
-            }
-            if (auto SI = dyn_cast<StoreInst>(a)) {
+            } else if (auto SI = dyn_cast<StoreInst>(a)) {
               Value *op = SI->getValueOperand();
               gepsToErase.insert(SI);
               geps.emplace_back(-1, op);
+            } else {
+              llvm::errs() << "unknown tape user: " << a << "\n";
+              assert(0 && "unknown tape user");
+              llvm_unreachable("unknown tape user");
             }
           }
           for (auto gep : gepsToErase)
@@ -3045,7 +3052,8 @@ public:
           if (Mode == DerivativeMode::ReverseModeGradient) {
             tape = gutils->cacheForReverse(Builder2, tape,
                                            getIndex(&call, CacheType::Tape));
-          }
+          } else
+            tape = lookup(tape, Builder2);
           auto alloc = IRBuilder<>(gutils->inversionAllocs)
                            .CreateAlloca(tape->getType());
           Builder2.CreateStore(tape, alloc);

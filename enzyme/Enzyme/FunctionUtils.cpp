@@ -649,6 +649,7 @@ Function* CreateMPIWrapper(Function* F) {
     W->addAttribute(AttributeList::FunctionIndex, Attribute::NoFree);
     W->addAttribute(AttributeList::FunctionIndex, Attribute::NoSync);
 #endif
+    W->addAttribute(AttributeList::FunctionIndex, Attribute::AlwaysInline);
     BasicBlock *entry =
         BasicBlock::Create(W->getContext(), "entry", W);
     IRBuilder<> B(entry);
@@ -660,16 +661,24 @@ Function* CreateMPIWrapper(Function* F) {
 }
 static void SimplifyMPIQueries(Function &NewF) {
   SmallVector<CallInst*, 4> Todo;
+  CallInst* OMPBounds = nullptr;
   for (auto &BB : NewF) {
     for (auto &I : BB) {
       if (auto CI = dyn_cast<CallInst>(&I)) {
-        if (CI->getCalledFunction() == nullptr)
+        Function *Fn = CI->getCalledFunction();
+        if (Fn == nullptr)
             continue;
-        if (CI->getCalledFunction()->getName() == "MPI_Comm_rank" || CI->getCalledFunction()->getName() == "MPI_Comm_size") {
+        if (Fn->getName() == "MPI_Comm_rank" || Fn->getName() == "MPI_Comm_size") {
             if (!CI->use_empty()) {
                 continue;
             }
             Todo.push_back(CI);
+        }
+        if (Fn->getName() == "__kmpc_for_static_init_4" ||
+            Fn->getName() == "__kmpc_for_static_init_4u" ||
+            Fn->getName() == "__kmpc_for_static_init_8" ||
+            Fn->getName() == "__kmpc_for_static_init_8u") {
+            OMPBounds = CI;
         }
       }
     }
@@ -680,6 +689,18 @@ static void SimplifyMPIQueries(Function &NewF) {
     auto res = B.CreateCall(CreateMPIWrapper(CI->getCalledFunction()), arg);
     B.CreateStore(res, CI->getArgOperand(1));
     CI->eraseFromParent();
+  }
+  if (OMPBounds) {
+    for (int i=4; i<=6; i++) {
+        auto AI = cast<AllocaInst>(OMPBounds->getArgOperand(i));
+        IRBuilder <> B(AI);
+        auto AI2 = B.CreateAlloca(AI->getAllocatedType());
+        B.SetInsertPoint(OMPBounds);
+        B.CreateStore(B.CreateLoad(AI), AI2);
+        OMPBounds->setArgOperand(i, AI2);
+        B.SetInsertPoint(OMPBounds->getNextNode());
+        B.CreateStore(B.CreateLoad(AI2), AI);
+    }
   }
 }
 
@@ -698,6 +719,8 @@ static void ForceRecursiveInlining(Function *NewF, size_t Limit) {
                   "_ZN3std2io5stdio6_print"))
             continue;
           if (CI->getCalledFunction()->getName().startswith("_ZN4core3fmt"))
+            continue;
+          if (CI->getCalledFunction()->getName().startswith("enzyme_wrapmpi$$"))
             continue;
           if (CI->getCalledFunction()->hasFnAttribute(
                   Attribute::ReturnsTwice) ||
@@ -904,7 +927,7 @@ Function *PreProcessCache::preprocessForClone(Function *F,
     }
   }
 
-  if (true) {
+  {
   SimplifyMPIQueries(*NewF);
   PreservedAnalyses PA;
   FAM.invalidate(*NewF, PA);
