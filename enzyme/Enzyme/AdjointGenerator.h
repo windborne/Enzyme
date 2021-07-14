@@ -2828,6 +2828,7 @@ public:
       } else {
         llvm::errs() << " called: " << *called << "\n";
         llvm::errs() << "call: " << call << "\n";
+        llvm::errs() << "op: " << *call.getArgOperand(i) << " i="<< i << "\n";
         assert(0 && "out for omp not handled");
         argsInverted.push_back(DIFFE_TYPE::OUT_DIFF);
         assert(whatType(argType, Mode) == DIFFE_TYPE::OUT_DIFF ||
