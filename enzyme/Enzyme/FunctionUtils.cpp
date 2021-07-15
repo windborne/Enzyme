@@ -686,7 +686,7 @@ static void SimplifyMPIQueries(Function &NewF) {
             Fn->getName() == "__kmpc_for_static_init_4u" ||
             Fn->getName() == "__kmpc_for_static_init_8" ||
             Fn->getName() == "__kmpc_for_static_init_8u") {
-            OMPBounds = CI;
+            OMPBounds.push_back(CI);
         }
       }
     }
@@ -712,6 +712,7 @@ static void SimplifyMPIQueries(Function &NewF) {
       Bound->addParamAttr(i, Attribute::NoCapture);
     }
   }
+  llvm::errs() << "NewF: " << NewF << "\n";
 }
 
 /// Perform recursive inlinining on NewF up to the given limit

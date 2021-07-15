@@ -568,6 +568,7 @@ public:
     }
     for (auto v : unwrappedLoads) {
       if (v.second == I) {
+        llvm::errs() << " v.first: " << *v.first << "; I=v.second: " << *v.second << "\n";
         assert(0 && "erasing something in unwrappedLoads map");
       }
     }

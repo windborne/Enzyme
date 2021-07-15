@@ -287,6 +287,11 @@ struct CacheAnalysis {
     bool can_modref = is_value_mustcache_from_origin(obj);
 
     if (!can_modref) {
+        for (auto call : kmpcCall) {
+            if (OrigDT.dominates(&li, call)) {
+                return false;
+            }
+        }
       allFollowersOf(&li, [&](Instruction *inst2) {
         if (!inst2->mayWriteToMemory())
           return false;

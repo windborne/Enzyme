@@ -5053,25 +5053,6 @@ public:
       return;
     }
 
-    if (Mode != DerivativeMode::ReverseModePrimal && called) {
-      if (funcName == "__kmpc_for_static_init_4" ||
-          funcName == "__kmpc_for_static_init_4u" ||
-          funcName == "__kmpc_for_static_init_8" ||
-          funcName == "__kmpc_for_static_init_8u") {
-        IRBuilder<> Builder2(call.getParent());
-        getReverseBuilder(Builder2);
-        auto fini = called->getParent()->getFunction("__kmpc_for_static_fini");
-        assert(fini);
-        Value *args[] = {
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(1)),
-                   Builder2)};
-        auto fcall = Builder2.CreateCall(fini->getFunctionType(), fini, args);
-        fcall->setCallingConv(fini->getCallingConv());
-        return;
-      }
-    }
-
     if ((funcName.startswith("MPI_") || funcName.startswith("PMPI_")) &&
         (!gutils->isConstantInstruction(&call) || funcName == "MPI_Barrier" ||
          funcName == "MPI_Comm_free" || funcName == "MPI_Comm_disconnect" ||
