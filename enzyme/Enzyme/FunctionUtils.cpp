@@ -661,7 +661,7 @@ Function* CreateMPIWrapper(Function* F) {
 }
 static void SimplifyMPIQueries(Function &NewF) {
   SmallVector<CallInst*, 4> Todo;
-  CallInst* OMPBounds = nullptr;
+  SmallVector<CallInst*, 0> OMPBounds;
   for (auto &BB : NewF) {
     for (auto &I : BB) {
       if (auto CI = dyn_cast<CallInst>(&I)) {
@@ -678,7 +678,7 @@ static void SimplifyMPIQueries(Function &NewF) {
             Fn->getName() == "__kmpc_for_static_init_4u" ||
             Fn->getName() == "__kmpc_for_static_init_8" ||
             Fn->getName() == "__kmpc_for_static_init_8u") {
-            OMPBounds = CI;
+            OMPBounds.push_back(CI);
         }
       }
     }
@@ -690,18 +690,20 @@ static void SimplifyMPIQueries(Function &NewF) {
     B.CreateStore(res, CI->getArgOperand(1));
     CI->eraseFromParent();
   }
-  if (OMPBounds) {
+  for (auto Bound : OMPBounds) {
     for (int i=4; i<=6; i++) {
-        auto AI = cast<AllocaInst>(OMPBounds->getArgOperand(i));
+        auto AI = cast<AllocaInst>(Bound->getArgOperand(i));
         IRBuilder <> B(AI);
-        auto AI2 = B.CreateAlloca(AI->getAllocatedType());
-        B.SetInsertPoint(OMPBounds);
+        auto AI2 = B.CreateAlloca(AI->getAllocatedType(), nullptr, AI->getName() + "_smpl");
+        B.SetInsertPoint(Bound);
         B.CreateStore(B.CreateLoad(AI), AI2);
-        OMPBounds->setArgOperand(i, AI2);
-        B.SetInsertPoint(OMPBounds->getNextNode());
+        Bound->setArgOperand(i, AI2);
+        B.SetInsertPoint(Bound->getNextNode());
         B.CreateStore(B.CreateLoad(AI2), AI);
+        Bound->addParamAttr(i, Attribute::NoCapture);
     }
   }
+  llvm::errs() << "NewF: " << NewF << "\n";
 }
 
 /// Perform recursive inlinining on NewF up to the given limit

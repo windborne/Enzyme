@@ -1329,6 +1329,7 @@ public:
     }
 
     Logic.clear();
+
     return changed;
   }
 };

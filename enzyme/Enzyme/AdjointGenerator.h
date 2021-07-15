@@ -2774,6 +2774,9 @@ public:
     std::vector<Instruction *> postCreate;
     std::vector<Instruction *> userReplace;
 
+    SmallVector<Value*, 0> OutTypes;
+    SmallVector<Type*, 0> OutFPTypes;
+
     for (unsigned i = 3; i < call.getNumArgOperands(); ++i) {
 
       auto argi = gutils->getNewFromOriginal(call.getArgOperand(i));
@@ -2826,10 +2829,9 @@ public:
         assert(whatType(argType, Mode) == DIFFE_TYPE::DUP_ARG ||
                whatType(argType, Mode) == DIFFE_TYPE::CONSTANT);
       } else {
-        llvm::errs() << " called: " << *called << "\n";
-        llvm::errs() << "call: " << call << "\n";
-        llvm::errs() << "op: " << *call.getArgOperand(i) << " i="<< i << "\n";
-        assert(0 && "out for omp not handled");
+        assert(TR.query(call.getArgOperand(i)).Inner0().isFloat());
+        OutTypes.push_back(call.getArgOperand(i));
+        OutFPTypes.push_back(argType);
         argsInverted.push_back(DIFFE_TYPE::OUT_DIFF);
         assert(whatType(argType, Mode) == DIFFE_TYPE::OUT_DIFF ||
                whatType(argType, Mode) == DIFFE_TYPE::CONSTANT);
@@ -3046,7 +3048,7 @@ public:
       IRBuilder<> Builder2(call.getParent());
       getReverseBuilder(Builder2);
 
-      Value *newcalled = nullptr;
+      Function *newcalled = nullptr;
       if (called) {
         if (subdata->returns.find(AugmentedStruct::Tape) !=
             subdata->returns.end()) {
@@ -3069,6 +3071,110 @@ public:
             nextTypeInfo, uncacheable_args, subdata, /*AtomicAdd*/ true,
             /*postopt*/ false, /*omp*/ true);
 
+        Value *OutAlloc = nullptr;
+        if (OutTypes.size()) {
+            auto ST = StructType::get(newcalled->getContext(), OutFPTypes);
+            OutAlloc = IRBuilder<>(gutils->inversionAllocs)
+                           .CreateAlloca(ST);
+            args.push_back(OutAlloc);
+          
+            SmallVector<Type*, 3> MetaTypes;
+            for (auto P : cast<Function>(newcalled)->getFunctionType()->params()) {
+                MetaTypes.push_back(P);
+            }
+            MetaTypes.push_back(PointerType::getUnqual(ST));
+            auto FT = FunctionType::get(Type::getVoidTy(newcalled->getContext()), MetaTypes, false);
+#if LLVM_VERSION_MAJOR >= 10
+            Function *F = Function::Create(FT, GlobalVariable::InternalLinkage, cast<Function>(newcalled)->getName()+"#out", *task->getParent());
+#else
+            Function *F = Function::Create(FT, GlobalVariable::InternalLinkage, cast<Function>(newcalled)->getName()+"#out", task->getParent());
+#endif
+            BasicBlock *entry = BasicBlock::Create(newcalled->getContext(), "entry", F);
+            IRBuilder <>B(entry);
+            SmallVector<Value*, 2> SubArgs;
+            for (auto &arg : F->args())
+                SubArgs.push_back(&arg);
+            Value *cacheArg = SubArgs.back();
+            SubArgs.pop_back();
+            Value *outdiff = B.CreateCall(newcalled, SubArgs);
+            for (size_t ee=0; ee<OutTypes.size(); ee++) {
+                Value *dif = B.CreateExtractValue(outdiff, ee);
+          Value *Idxs[] = {
+              ConstantInt::get(Type::getInt64Ty(ST->getContext()), 0),
+              ConstantInt::get(Type::getInt32Ty(ST->getContext()), ee)};
+                Value *ptr = B.CreateInBoundsGEP(cacheArg, Idxs);
+      
+                if (dif->getType()->isIntOrIntVectorTy()) {
+
+        ptr = B.CreateBitCast(
+            ptr, PointerType::get(
+                     IntToFloatTy(dif->getType()),
+                     cast<PointerType>(ptr->getType())->getAddressSpace()));
+        dif = B.CreateBitCast(dif, IntToFloatTy(dif->getType()));
+      }
+
+#if LLVM_VERSION_MAJOR >= 10
+    MaybeAlign align;
+#else
+    unsigned align = 0;
+#endif
+
+#if LLVM_VERSION_MAJOR >= 9
+      AtomicRMWInst::BinOp op = AtomicRMWInst::FAdd;
+      if (auto vt = dyn_cast<VectorType>(dif->getType())) {
+  #if LLVM_VERSION_MAJOR >= 12
+        assert(!vt->getElementCount().isScalable());
+        size_t numElems = vt->getElementCount().getKnownMinValue();
+  #else
+        size_t numElems = vt->getNumElements();
+  #endif
+        for (size_t i = 0; i < numElems; ++i) {
+          auto vdif = B.CreateExtractElement(dif, i);
+          Value *Idxs[] = {
+              ConstantInt::get(Type::getInt64Ty(vt->getContext()), 0),
+              ConstantInt::get(Type::getInt32Ty(vt->getContext()), i)};
+          auto vptr = B.CreateGEP(ptr, Idxs);
+  #if LLVM_VERSION_MAJOR >= 13
+          B.CreateAtomicRMW(op, vptr, vdif, align,
+                                   AtomicOrdering::Monotonic,
+                                   SyncScope::System);
+  #elif LLVM_VERSION_MAJOR >= 11
+          AtomicRMWInst *rmw = B.CreateAtomicRMW(
+              op, vptr, vdif, AtomicOrdering::Monotonic, SyncScope::System);
+          if (align)
+            rmw->setAlignment(align.getValue());
+  #else
+          B.CreateAtomicRMW(op, vptr, vdif, AtomicOrdering::Monotonic,
+                                   SyncScope::System);
+  #endif
+        }
+      } else {
+  #if LLVM_VERSION_MAJOR >= 13
+        B.CreateAtomicRMW(op, ptr, dif, align, AtomicOrdering::Monotonic,
+                                 SyncScope::System);
+  #elif LLVM_VERSION_MAJOR >= 11
+        AtomicRMWInst *rmw = B.CreateAtomicRMW(
+            op, ptr, dif, AtomicOrdering::Monotonic, SyncScope::System);
+        if (align)
+          rmw->setAlignment(align.getValue());
+  #else
+        B.CreateAtomicRMW(op, ptr, dif, AtomicOrdering::Monotonic,
+                                 SyncScope::System);
+  #endif
+            }
+#else
+      llvm::errs() << "unhandled atomic fadd on llvm version " << *ptr << " "
+                   << *dif << "\n";
+      llvm_unreachable("unhandled atomic fadd");
+#endif
+
+
+
+        }
+            B.CreateRetVoid();
+            newcalled = F;
+        }
+
         auto numargs = ConstantInt::get(Type::getInt32Ty(call.getContext()),
                                         args.size() - 3);
         args[0] =
@@ -3081,6 +3187,17 @@ public:
             Builder2.CreateCall(kmpc->getFunctionType(), kmpc, args);
         diffes->setCallingConv(call.getCallingConv());
         diffes->setDebugLoc(gutils->getNewFromOriginal(call.getDebugLoc()));
+
+        for (size_t i=0; i<OutTypes.size(); i++) {
+        
+            size_t size = 1;
+            if (OutTypes[i]->getType()->isSized())
+              size = (gutils->newFunc->getParent()->getDataLayout().getTypeSizeInBits(OutTypes[i]->getType()) + 7) / 8;
+          Value *Idxs[] = {
+              ConstantInt::get(Type::getInt64Ty(call.getContext()), 0),
+              ConstantInt::get(Type::getInt32Ty(call.getContext()), i)};
+            ((DiffeGradientUtils*)gutils)->addToDiffe(OutTypes[i], Builder2.CreateLoad(Builder2.CreateInBoundsGEP(OutAlloc, Idxs)), Builder2, TR.addingType(size, OutTypes[i]));
+        }
 
         if (tape) {
           for (auto idx : subdata->tapeIndiciesToFree) {
@@ -4869,25 +4986,6 @@ public:
       return;
     }
 
-    if (Mode != DerivativeMode::ReverseModePrimal && called) {
-      if (funcName == "__kmpc_for_static_init_4" ||
-          funcName == "__kmpc_for_static_init_4u" ||
-          funcName == "__kmpc_for_static_init_8" ||
-          funcName == "__kmpc_for_static_init_8u") {
-        IRBuilder<> Builder2(call.getParent());
-        getReverseBuilder(Builder2);
-        auto fini = called->getParent()->getFunction("__kmpc_for_static_fini");
-        assert(fini);
-        Value *args[] = {
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(1)),
-                   Builder2)};
-        auto fcall = Builder2.CreateCall(fini->getFunctionType(), fini, args);
-        fcall->setCallingConv(fini->getCallingConv());
-        return;
-      }
-    }
-
     if ((funcName.startswith("MPI_") || funcName.startswith("PMPI_")) &&
         (!gutils->isConstantInstruction(&call) || funcName == "MPI_Barrier" ||
          funcName == "MPI_Comm_free" || funcName == "MPI_Comm_disconnect" ||
@@ -4919,6 +5017,59 @@ public:
         visitOMPCall(call);
         return;
       }
+      if (funcName == "__kmpc_for_static_init_4" ||
+          funcName == "__kmpc_for_static_init_4u" ||
+          funcName == "__kmpc_for_static_init_8" ||
+          funcName == "__kmpc_for_static_init_8u") {
+        if (Mode != DerivativeMode::ReverseModePrimal) {
+            IRBuilder<> Builder2(call.getParent());
+            getReverseBuilder(Builder2);
+            auto fini = called->getParent()->getFunction("__kmpc_for_static_fini");
+            assert(fini);
+            Value *args[] = {
+                lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
+                lookup(gutils->getNewFromOriginal(call.getArgOperand(1)),
+                       Builder2)};
+            auto fcall = Builder2.CreateCall(fini->getFunctionType(), fini, args);
+            fcall->setCallingConv(fini->getCallingConv());
+        }
+        return;
+      }
+      if (funcName == "__kmpc_for_static_fini") {
+        if (Mode != DerivativeMode::ReverseModePrimal) {
+            eraseIfUnused(call, /*erase*/ true, /*check*/ false);
+        }
+        return;
+      }
+      // TODO check
+      // Adjoint of barrier is to place a barrier at the corresponding
+      // location in the reverse.
+      if (funcName == "__kmpc_barrier") {
+          if (Mode == DerivativeMode::ReverseModeGradient ||
+              Mode == DerivativeMode::ReverseModeCombined) {
+            IRBuilder<> Builder2(call.getParent());
+            getReverseBuilder(Builder2);
+#if LLVM_VERSION_MAJOR >= 11
+            auto callval = call.getCalledOperand();
+#else
+            auto callval = call.getCalledValue();
+#endif
+            Value *args[] = {
+                lookup(gutils->getNewFromOriginal(call.getOperand(0)), Builder2),
+                lookup(gutils->getNewFromOriginal(call.getOperand(1)), Builder2)
+            };
+            Builder2.CreateCall(call.getFunctionType(), callval, args);
+          }
+          return;
+      }
+
+      if (funcName.startswith("__kmpc")) {
+        llvm::errs() << *gutils->oldFunc << "\n";
+        llvm::errs() << call << "\n";
+        assert(0 && "unhandled openmp function");
+        llvm_unreachable("unhandled openmp function");
+      }
+
       if (funcName == "asin" || funcName == "asinf" || funcName == "asinl") {
         if (gutils->knownRecomputeHeuristic.find(orig) !=
             gutils->knownRecomputeHeuristic.end()) {

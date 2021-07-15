@@ -1076,6 +1076,12 @@ CacheUtility::SubLimitType CacheUtility::getSubLimits(bool inForwardPass,
         allocationPreheaders[i] = contexts[i].preheader;
         allocationBuilder.SetInsertPoint(&allocationPreheaders[i]->back());
       }
+      if (limitMinus1 == nullptr) {
+        llvm::errs() << " newFunc: " << *newFunc << "\n";
+        llvm::errs() << " alloc ph: " << *allocationPreheaders[i] << "\n";
+        llvm::errs() << " maxlim: " << *contexts[i].maxLimit << "\n";
+        llvm::errs() << " ctx.blk: " << *ctx.Block << "\n";
+      }
       assert(limitMinus1 != nullptr);
 
       ValueToValueMapTy reverseMap;

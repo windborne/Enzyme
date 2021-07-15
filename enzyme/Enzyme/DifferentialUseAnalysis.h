@@ -65,8 +65,6 @@ static inline bool is_use_directly_needed_in_reverse(
                   F->getName() == "__kmpc_for_static_init_8u") {
                 if (gutils->OrigDT.dominates(SI, CI))
                     return true;
-                else
-                    assert(gutils->OrigDT.dominates(CI, SI));
               }
             }
           }

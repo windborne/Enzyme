@@ -96,7 +96,7 @@ struct CacheAnalysis {
   const std::map<Argument *, bool> &uncacheable_args;
   DerivativeMode mode;
   std::map<Value *, bool> seen;
-  CallInst* kmpcCall;
+  SmallVector<CallInst*, 0> kmpcCall;
   CacheAnalysis(
       AAResults &AA, Function *oldFunc, ScalarEvolution &SE, LoopInfo &OrigLI,
       DominatorTree &OrigDT, TargetLibraryInfo &TLI,
@@ -114,10 +114,19 @@ struct CacheAnalysis {
                   F->getName() == "__kmpc_for_static_init_4u" ||
                   F->getName() == "__kmpc_for_static_init_8" ||
                   F->getName() == "__kmpc_for_static_init_8u") {
-                kmpcCall = CI;
+                kmpcCall.push_back(CI);
               }
             }
           }
+     if (kmpcCall.size() > 1) {
+
+         for (auto call : kmpcCall) {
+            EmitFailure("MultiOMPForInParallel", call->getDebugLoc(), call,
+                        " multiple OpenMP for loops within a single parallel not yet handled", *call);
+
+         }
+         llvm_unreachable("Unhandled OpenMP input");
+     }
   }
 
   bool is_value_mustcache_from_origin(Value *obj) {
@@ -267,6 +276,11 @@ struct CacheAnalysis {
     bool can_modref = is_value_mustcache_from_origin(obj);
 
     if (!can_modref) {
+        for (auto call : kmpcCall) {
+            if (OrigDT.dominates(&li, call)) {
+                return false;
+            }
+        }
       allFollowersOf(&li, [&](Instruction *inst2) {
         if (!inst2->mayWriteToMemory())
           return false;
