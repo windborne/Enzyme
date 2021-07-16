@@ -3037,7 +3037,6 @@ public:
 
     auto found = subdata->returns.find(AugmentedStruct::DifferentialReturn);
     assert(found == subdata->returns.end());
-    ;
 
     found = subdata->returns.find(AugmentedStruct::Return);
     assert(found == subdata->returns.end());
@@ -3046,6 +3045,9 @@ public:
         Mode == DerivativeMode::ReverseModeCombined) {
       IRBuilder<> Builder2(call.getParent());
       getReverseBuilder(Builder2);
+
+      if (Mode == DerivativeMode::ReverseModeGradient)
+        eraseIfUnused(call, /*erase*/true, /*check*/false);
 
       Function *newcalled = nullptr;
       if (called) {
