@@ -131,8 +131,6 @@ public:
     erased.insert(&I);
     if (erase) {
       if (auto inst = dyn_cast<Instruction>(iload)) {
-        if (pn)
-          gutils->replaceAWithB(iload, pn);
         gutils->erase(inst);
       }
     }
@@ -421,8 +419,7 @@ public:
           newip = gutils->invertPointerM(&I, BuilderZ);
           assert(newip->getType() == type);
 
-          if (Mode == DerivativeMode::ReverseModePrimal && can_modref &&
-              needShadow) {
+          if (Mode == DerivativeMode::ReverseModePrimal && can_modref && needShadow) {
             gutils->cacheForReverse(BuilderZ, newip,
                                     getIndex(&I, CacheType::Shadow));
           }
@@ -3074,6 +3071,7 @@ public:
                       cast<PointerType>(tapeArg->getType())->getElementType());
           BuilderZ.CreateStore(tape, alloc);
           pre_args.push_back(alloc);
+          assert(tape);
           gutils->cacheForReverse(BuilderZ, tape,
                                   getIndex(&call, CacheType::Tape));
         }
