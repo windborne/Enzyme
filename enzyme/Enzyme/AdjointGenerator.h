@@ -123,8 +123,6 @@ public:
     erased.insert(&I);
     if (erase) {
       if (auto inst = dyn_cast<Instruction>(iload)) {
-        if (pn)
-          gutils->replaceAWithB(iload, pn);
         gutils->erase(inst);
       }
     }
@@ -373,8 +371,7 @@ public:
           newip = gutils->invertPointerM(&I, BuilderZ);
           assert(newip->getType() == type);
 
-          if (Mode == DerivativeMode::ReverseModePrimal && can_modref &&
-              needShadow) {
+          if (Mode == DerivativeMode::ReverseModePrimal && can_modref) {
             gutils->cacheForReverse(BuilderZ, newip,
                                     getIndex(&I, CacheType::Shadow));
           }
@@ -3001,12 +2998,14 @@ public:
                                  : ph.CreateInBoundsGEP(tapeArg, Idxs)));
             cast<Instruction>(op)->eraseFromParent();
           }
+          assert(tape);
           auto alloc =
               IRBuilder<>(gutils->inversionAllocs)
                   .CreateAlloca(
                       cast<PointerType>(tapeArg->getType())->getElementType());
           BuilderZ.CreateStore(tape, alloc);
           pre_args.push_back(alloc);
+          assert(tape);
           gutils->cacheForReverse(BuilderZ, tape,
                                   getIndex(&call, CacheType::Tape));
         }
@@ -3053,10 +3052,14 @@ public:
         if (subdata->returns.find(AugmentedStruct::Tape) !=
             subdata->returns.end()) {
           if (Mode == DerivativeMode::ReverseModeGradient) {
+            if (tape == nullptr)
+              tape = Builder2.CreatePHI(Type::getInt8Ty(call.getContext()), 0, "tapeArg");
             tape = gutils->cacheForReverse(Builder2, tape,
-                                           getIndex(&call, CacheType::Tape));
-          } else
-            tape = lookup(tape, Builder2);
+                                         getIndex(&call, CacheType::Tape),
+                                         /*ignoreType*/ true);
+          }
+          
+          tape = lookup(tape, Builder2);
           auto alloc = IRBuilder<>(gutils->inversionAllocs)
                            .CreateAlloca(tape->getType());
           Builder2.CreateStore(tape, alloc);
@@ -4931,7 +4934,7 @@ public:
             augmentedReturn->tapeIndices.find(std::make_pair(
                 orig, CacheType::Tape)) != augmentedReturn->tapeIndices.end()) {
           tape = Builder2.CreatePHI(Type::getInt32Ty(orig->getContext()), 0);
-          tape = gutils->cacheForReverse(Builder2, (Value *)tape,
+          tape = gutils->cacheForReverse(Builder2, tape,
                                          getIndex(orig, CacheType::Tape),
                                          /*ignoreType*/ true);
         }

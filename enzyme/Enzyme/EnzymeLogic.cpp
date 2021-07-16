@@ -96,15 +96,17 @@ struct CacheAnalysis {
   const std::map<Argument *, bool> &uncacheable_args;
   DerivativeMode mode;
   std::map<Value *, bool> seen;
+  bool omp;
   SmallVector<CallInst*, 0> kmpcCall;
   CacheAnalysis(
       AAResults &AA, Function *oldFunc, ScalarEvolution &SE, LoopInfo &OrigLI,
       DominatorTree &OrigDT, TargetLibraryInfo &TLI,
       const SmallPtrSetImpl<const Instruction *> &unnecessaryInstructions,
-      const std::map<Argument *, bool> &uncacheable_args, DerivativeMode mode)
+      const std::map<Argument *, bool> &uncacheable_args, DerivativeMode mode,
+      bool omp)
       : AA(AA), oldFunc(oldFunc), SE(SE), OrigLI(OrigLI), OrigDT(OrigDT),
         TLI(TLI), unnecessaryInstructions(unnecessaryInstructions),
-        uncacheable_args(uncacheable_args), mode(mode), kmpcCall(nullptr) {
+        uncacheable_args(uncacheable_args), mode(mode), omp(omp) {
 
     for (auto &BB : *oldFunc)
         for (auto &I : BB)
@@ -257,12 +259,6 @@ struct CacheAnalysis {
       return false;
     }
 
-    if (kmpcCall) {
-        if (OrigDT.dominates(&li, kmpcCall)) {
-            return false;
-        }
-    }
-
     // Find the underlying object for the pointer operand of the load
     // instruction.
     auto obj =
@@ -272,6 +268,15 @@ struct CacheAnalysis {
         GetUnderlyingObject(li.getPointerOperand(),
                             oldFunc->getParent()->getDataLayout(), 100);
 #endif
+
+    // Openmp bound and local thread id are unchanging
+    // definitionally cacheable.
+    if (omp)
+        if (auto arg = dyn_cast<Argument>(obj)) {
+            if (arg->getArgNo() < 2) {
+                return false;
+            }
+        }
 
     bool can_modref = is_value_mustcache_from_origin(obj);
 
@@ -1545,7 +1550,7 @@ const AugmentedReturn &EnzymeLogic::CreateAugmentedPrimal(
                    PPC.FAM.getResult<ScalarEvolutionAnalysis>(*gutils->oldFunc),
                    gutils->OrigLI, gutils->OrigDT, TLI,
                    unnecessaryInstructionsTmp, _uncacheable_argsPP,
-                   DerivativeMode::ReverseModePrimal);
+                   DerivativeMode::ReverseModePrimal, omp);
   const std::map<CallInst *, const std::map<Argument *, bool>>
       uncacheable_args_map = CA.compute_uncacheable_args_for_callsites();
 
@@ -2790,7 +2795,7 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
   CacheAnalysis CA(gutils->OrigAA, gutils->oldFunc,
                    PPC.FAM.getResult<ScalarEvolutionAnalysis>(*gutils->oldFunc),
                    gutils->OrigLI, gutils->OrigDT, TLI,
-                   unnecessaryInstructionsTmp, _uncacheable_argsPP, mode);
+                   unnecessaryInstructionsTmp, _uncacheable_argsPP, mode, omp);
   const std::map<CallInst *, const std::map<Argument *, bool>>
       uncacheable_args_map =
           (augmenteddata) ? augmenteddata->uncacheable_args_map

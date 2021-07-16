@@ -164,6 +164,10 @@ static inline bool is_use_directly_needed_in_reverse(
       if (F->getName() == "MPI_Waitall")
           if (val != CI->getArgOperand(0))
               return false;
+      // Since adjoint of barrier is another barrier in reverse
+      // we still need even if instruction is inactive
+      if (F->getName() == "__kmpc_barrier" || F->getName() == "MPI_Barrier")
+          return true;
     }
   }
 

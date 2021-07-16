@@ -3171,7 +3171,8 @@ void TypeAnalyzer::visitCallInst(CallInst &call) {
       updateAnalysis(call.getOperand(8), TypeTree(BaseType::Integer).Only(-1), &call);
       return;
     }
-    if (funcName == "omp_get_max_threads") {
+    if (funcName == "omp_get_max_threads" || funcName == "omp_get_thread_num" ||
+        funcName == "omp_get_num_threads") {
       updateAnalysis(&call, TypeTree(BaseType::Integer).Only(-1), &call);
       return;
     }
