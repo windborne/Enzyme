@@ -259,12 +259,6 @@ struct CacheAnalysis {
       return false;
     }
 
-    if (kmpcCall) {
-        if (OrigDT.dominates(&li, kmpcCall)) {
-            return false;
-        }
-    }
-
     // Find the underlying object for the pointer operand of the load
     // instruction.
     auto obj =
