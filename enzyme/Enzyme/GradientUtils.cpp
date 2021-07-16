@@ -578,7 +578,6 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
     // llvm::errs() << "inst: " << *inst << "\n";
     for (unsigned i = 0; i < inst->getNumIndices(); ++i) {
       Value *a = inst->getOperand(1 + i);
-      assert(a->getName() != "<badref>");
       auto op = getOp(a);
       if (op == nullptr)
         goto endCheck;
@@ -609,12 +608,13 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
         parent = BuilderM.GetInsertBlock();
       if (!parent ||
           LI.getLoopFor(parent) == LI.getLoopFor(load->getParent()) ||
-          DT.dominates(load, parent))
+          DT.dominates(load, parent)) {
         legalMove = legalRecompute(load, available, &BuilderM);
-      else
+      } else {
         legalMove =
             legalRecompute(load, available, &BuilderM, /*reverse*/ false,
                            /*legalRecomputeCache*/ false);
+      }
     }
     if (!legalMove) {
       EmitWarning("UncacheableUnwrap", load->getDebugLoc(),
@@ -628,8 +628,9 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
 
     Value *pidx = getOp(load->getOperand(0));
 
-    if (pidx == nullptr)
+    if (pidx == nullptr) {
       goto endCheck;
+    }
 
     if (pidx->getType() != load->getOperand(0)->getType()) {
       llvm::errs() << "load: " << *load << "\n";
@@ -642,6 +643,10 @@ Value *GradientUtils::unwrapM(Value *const val, IRBuilder<> &BuilderM,
     auto toreturn = BuilderM.CreateLoad(pidx, load->getName() + "_unwrap");
     toreturn->copyIRFlags(load);
     unwrappedLoads[toreturn] = load;
+    if (toreturn->getParent()->getParent() != load->getParent()->getParent())
+      toreturn->setDebugLoc(nullptr);
+    else
+      toreturn->setDebugLoc(getNewFromOriginal(load->getDebugLoc()));
 #if LLVM_VERSION_MAJOR >= 10
     toreturn->setAlignment(load->getAlign());
 #else
@@ -1693,7 +1698,8 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
 
           AllocaInst *preerase = found->first;
           scopeMap.erase(malloc);
-          erase(preerase);
+          if (replace)
+            erase(preerase);
         }
       }
       if (!ignoreType && replace)
@@ -1799,7 +1805,7 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
          i < limit; ++i) {
       innerType = cast<PointerType>(innerType)->getElementType();
     }
-
+    assert(!ignoreType);
     if (EfficientBoolCache && malloc->getType()->isIntegerTy() &&
         toadd->getType() != innerType &&
         cast<IntegerType>(malloc->getType())->getBitWidth() == 1) {
@@ -2110,7 +2116,7 @@ bool GradientUtils::legalRecompute(const Value *val,
 
       // TODO mark all the explicitly legal nodes (caches, etc)
       return true;
-      llvm::errs() << *li
+      llvm::errs() << *li << " orig: " << orig
                    << " parent: " << li->getParent()->getParent()->getName()
                    << "\n";
       llvm_unreachable("unknown load to redo!");
