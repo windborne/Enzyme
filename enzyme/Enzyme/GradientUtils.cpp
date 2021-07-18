@@ -1655,8 +1655,7 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
 
           AllocaInst *preerase = found->first;
           scopeMap.erase(malloc);
-          if (replace)
-            erase(preerase);
+          erase(preerase);
         }
       }
       if (!ignoreType && replace)
