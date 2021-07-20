@@ -1100,7 +1100,7 @@ bool legalCombinedForwardReverse(
           llvm::errs() << " [bi] failed to replace function "
                        << (called->getName()) << " due to " << *I << "\n";
         else
-          llvm::errs() << " [bi] ailed to replace function " << (*calledValue)
+          llvm::errs() << " [bi] failed to replace function " << (*calledValue)
                        << " due to " << *I << "\n";
       }
       return;
@@ -1145,7 +1145,7 @@ bool legalCombinedForwardReverse(
           llvm::errs() << " [phi] failed to replace function "
                        << (called->getName()) << " due to " << *I << "\n";
         else
-          llvm::errs() << " [phi] ailed to replace function " << (*calledValue)
+          llvm::errs() << " [phi] failed to replace function " << (*calledValue)
                        << " due to " << *I << "\n";
       }
       return;
@@ -1159,7 +1159,7 @@ bool legalCombinedForwardReverse(
           llvm::errs() << " [nv] failed to replace function "
                        << (called->getName()) << " due to " << *I << "\n";
         else
-          llvm::errs() << " [nv] ailed to replace function " << (*calledValue)
+          llvm::errs() << " [nv] failed to replace function " << (*calledValue)
                        << " due to " << *I << "\n";
       }
       return;
@@ -1171,7 +1171,7 @@ bool legalCombinedForwardReverse(
           llvm::errs() << " [ci] failed to replace function "
                        << (called->getName()) << " due to " << *I << "\n";
         else
-          llvm::errs() << " [ci] ailed to replace function " << (*calledValue)
+          llvm::errs() << " [ci] failed to replace function " << (*calledValue)
                        << " due to " << *I << "\n";
       }
       return;
@@ -1188,8 +1188,8 @@ bool legalCombinedForwardReverse(
             llvm::errs() << " [am] failed to replace function "
                          << (called->getName()) << " due to " << *I << "\n";
           else
-            llvm::errs() << " [am] ailed to replace function " << (*calledValue)
-                         << " due to " << *I << "\n";
+            llvm::errs() << " [am] failed to replace function "
+                         << (*calledValue) << " due to " << *I << "\n";
         }
         return;
       }
@@ -1281,7 +1281,7 @@ bool legalCombinedForwardReverse(
             llvm::errs() << " [nonspec] failed to replace function "
                          << (called->getName()) << " due to " << *inst << "\n";
           else
-            llvm::errs() << " [nonspec] ailed to replace function "
+            llvm::errs() << " [nonspec] failed to replace function "
                          << (*calledValue) << " due to " << *inst << "\n";
         }
         legal = false;
@@ -1297,7 +1297,7 @@ bool legalCombinedForwardReverse(
           llvm::errs() << " [premove] failed to replace function "
                        << (called->getName()) << " due to " << *inst << "\n";
         else
-          llvm::errs() << " [premove] ailed to replace function "
+          llvm::errs() << " [premove] failed to replace function "
                        << (*calledValue) << " due to " << *inst << "\n";
       }
       // Early exit
