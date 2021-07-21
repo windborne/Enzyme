@@ -3057,6 +3057,7 @@ public:
                                   getIndex(&call, CacheType::Tape));
         }
 
+        llvm::errs() << " aug newcalled: " << *newcalled << "\n";
         auto numargs = ConstantInt::get(Type::getInt32Ty(call.getContext()),
                                         pre_args.size() - 3);
         pre_args[0] = gutils->getNewFromOriginal(call.getArgOperand(0));
@@ -3232,6 +3233,7 @@ public:
           newcalled = F;
         }
 
+        llvm::errs() << " grad newcalled: " << *newcalled << "\n";
         auto numargs = ConstantInt::get(Type::getInt32Ty(call.getContext()),
                                         args.size() - 3);
         args[0] =
