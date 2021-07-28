@@ -83,3 +83,7 @@ If you run Enzyme tests and get an error like `/bin/sh: 1: ../../: Permission de
 ```sh
 cmake .. -DLLVM_EXTERNAL_LIT=/path/to/lit/lit.py
 ```
+
+## Debugging Enzyme
+
+For debugging purposes we have created [docker images]() which closely resemble all of our CI environments. If you are using vscode you can build and test enzyme inside of a [vscode devcontainer]().
