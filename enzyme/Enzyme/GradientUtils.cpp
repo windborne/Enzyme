@@ -1736,6 +1736,11 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
                 for (unsigned i = 0; i < z->getNumOperands(); ++i) {
                   ops.push_back(z->getOperand(i));
                 }
+                if (!z->getParent()) {
+                    llvm::errs() << " newFunc: " << *newFunc << "\n";
+                    llvm::errs() << " z: " << *z << "\n";
+                }
+                assert(z->getParent());
                 erase(z);
               }
             }
