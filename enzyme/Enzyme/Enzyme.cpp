@@ -1082,7 +1082,7 @@ public:
 
   bool runOnModule(Module &M) override {
     Logic.clear();
-
+    
     bool changed = false;
     std::vector<GlobalVariable *> globalsToErase;
     for (GlobalVariable &g : M.globals()) {

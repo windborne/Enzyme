@@ -3161,8 +3161,11 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
           BuilderZ.SetInsertPoint(
               cast<Instruction>(newi)->getParent()->getFirstNonPHI());
         }
+        llvm::errs() << " orig: " << *m.first.first << "\n";
+        llvm::errs() << " + newi: " << *newi << "\n";
         Value *nexti = gutils->cacheForReverse(
             BuilderZ, newi, m.second, /*ignoreType*/ false, /*replace*/ false);
+        llvm::errs() << " + nexti: " << *nexti << "\n";
         newIToNextI.emplace_back(newi, nexti);
       }
     }
