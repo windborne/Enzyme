@@ -2205,12 +2205,6 @@ bool GradientUtils::legalRecompute(const Value *val,
     }
   }
 
-  if (auto inst = dyn_cast<Instruction>(val)) {
-    if (inst->mayReadOrWriteMemory()) {
-      return false;
-    }
-  }
-
   if (auto ci = dyn_cast<CallInst>(val)) {
     if (ci->doesNotAccessMemory()) return true;
     if (auto called = ci->getCalledFunction()) {
@@ -2224,6 +2218,12 @@ bool GradientUtils::legalRecompute(const Value *val,
           n == "omp_get_max_threads") {
         return true;
       }
+    }
+  }
+
+  if (auto inst = dyn_cast<Instruction>(val)) {
+    if (inst->mayReadOrWriteMemory()) {
+      return false;
     }
   }
 
@@ -2825,8 +2825,9 @@ Value *GradientUtils::invertPointerM(Value *oval, IRBuilder<> &BuilderM,
     return BuilderM.CreatePointerCast(GV, fn->getType());
   } else if (auto arg = dyn_cast<CastInst>(oval)) {
     IRBuilder<> bb(getNewFromOriginal(arg));
+    Value* invertOp = invertPointerM(arg->getOperand(0), bb);
     invertedPointers[arg] =
-        bb.CreateCast(arg->getOpcode(), invertPointerM(arg->getOperand(0), bb),
+        bb.CreateCast(arg->getOpcode(), invertOp,
                       arg->getDestTy(), arg->getName() + "'ipc");
     return lookupM(invertedPointers[arg], BuilderM);
   } else if (auto arg = dyn_cast<ConstantExpr>(oval)) {
@@ -3097,7 +3098,6 @@ Value *GradientUtils::invertPointerM(Value *oval, IRBuilder<> &BuilderM,
         which->addIncoming(val, cast<BasicBlock>(getNewFromOriginal(
                                     phi->getIncomingBlock(i))));
       }
-
       return lookupM(which, BuilderM);
     }
   }
