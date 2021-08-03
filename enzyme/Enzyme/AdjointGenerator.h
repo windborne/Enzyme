@@ -2924,7 +2924,7 @@ public:
           nextTypeInfo.Arguments.insert(
               std::pair<Argument *, TypeTree>(&arg, IntPtr));
           nextTypeInfo.KnownValues.insert(
-              std::pair<Argument *, std::set<int64_t>>(&arg, {}));
+              std::pair<Argument *, std::set<int64_t>>(&arg, {0}));
         } else {
           nextTypeInfo.Arguments.insert(std::pair<Argument *, TypeTree>(
               &arg, TR.query(call.getArgOperand(argnum - 2 + 3))));
@@ -5450,7 +5450,7 @@ public:
         return;
       }
 
-      if (funcName.startswith("__kmpc")) {
+      if (funcName.startswith("__kmpc") && funcName != "__kmpc_global_thread_num") {
         llvm::errs() << *gutils->oldFunc << "\n";
         llvm::errs() << call << "\n";
         assert(0 && "unhandled openmp function");
@@ -6907,6 +6907,10 @@ public:
       auto callval = orig->getCalledValue();
 #endif
 
+      if (gutils->isConstantValue(callval)) {
+          llvm::errs() << *gutils->newFunc->getParent() << "\n";
+          llvm::errs() << " orig: " << *orig << " callval: " << *callval << "\n";
+      }
       assert(!gutils->isConstantValue(callval));
       newcalled = gutils->invertPointerM(callval, Builder2);
 

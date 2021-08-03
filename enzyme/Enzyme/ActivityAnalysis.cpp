@@ -143,6 +143,7 @@ const std::set<std::string> KnownInactiveFunctions = {
     "__kmpc_barrier_master",
     "__kmpc_barrier_master_nowait",
     "__kmpc_barrier_end_barrier_master",
+    "__kmpc_global_thread_num",
     "omp_get_max_threads",
     "malloc_usable_size",
     "malloc_size",
@@ -1153,6 +1154,10 @@ bool ActivityAnalyzer::isConstantValue(TypeResults &TR, Value *Val) {
               continue;
           }
 
+          if (CI->hasFnAttr("enzyme_inactive")) {
+            return true;
+          }
+
           Function *F = CI->getCalledFunction();
 #if LLVM_VERSION_MAJOR >= 11
           if (auto Cst = dyn_cast<CastInst>(CI->getCalledOperand()))
@@ -1618,11 +1623,14 @@ bool ActivityAnalyzer::isInstructionInactiveFromOrigin(TypeResults &TR,
       return true;
     }
     Function *called = op->getCalledFunction();
+    Value* calledValue;
 #if LLVM_VERSION_MAJOR >= 11
-    if (auto castinst = dyn_cast<ConstantExpr>(op->getCalledOperand()))
+    calledValue = op->getCalledOperand();
 #else
-    if (auto castinst = dyn_cast<ConstantExpr>(op->getCalledValue()))
+    calledValue = op->getCalledValue();
 #endif
+
+    if (auto castinst = dyn_cast<ConstantExpr>(calledValue))
     {
       if (castinst->isCast())
         if (auto fn = dyn_cast<Function>(castinst->getOperand(0))) {
@@ -1663,6 +1671,11 @@ bool ActivityAnalyzer::isInstructionInactiveFromOrigin(TypeResults &TR,
                        << *inst << "\n";
         return true;
       }
+    } else if (!isa<Constant>(calledValue) && isConstantValue(TR, calledValue)) {
+        if (EnzymePrintActivity)
+          llvm::errs() << "constant(" << (int)directions << ") up-constfn "
+                       << *inst << " - " << *calledValue << "\n";
+        return true;
     }
   }
   // Intrinsics known always to be inactive
