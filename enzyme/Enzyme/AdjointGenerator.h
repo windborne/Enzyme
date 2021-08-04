@@ -4081,6 +4081,8 @@ public:
           Mode == DerivativeMode::ReverseModeGradient) {
         IRBuilder<> Builder2(call.getParent());
         getReverseBuilder(Builder2);
+        assert(call.getArgOperand(0) == Builder2.getInt32(101) &&
+               "Unhandled Order");
         auto dfunc = gutils->oldFunc->getParent()->getOrInsertFunction(
             funcName, Builder2.getVoidTy(), Builder2.getInt32Ty(),
             Builder2.getInt32Ty(), Builder2.getInt32Ty(), Builder2.getInt32Ty(),
@@ -4089,38 +4091,61 @@ public:
             Builder2.getInt32Ty(), call.getArgOperand(7)->getType(),
             Builder2.getInt32Ty(), call.getArgOperand(6)->getType(),
             call.getArgOperand(7)->getType(), Builder2.getInt32Ty());
-        auto zeroval = Builder2.getInt32(0);
-        auto dzeroval = Builder2.CreateBitCast(zeroval, innerType);
+        auto oneval = Builder2.getInt32(1);
+        auto doneval = Builder2.CreateBitCast(oneval, innerType);
+        Value *sabtrans, *sabcol, *sbatrans, *sacol, *sbarow;
+        if (call.getArgOperand(1) == Builder2.getInt32(112)) {
+          sbatrans = Builder2.getInt32(111);
+          sacol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                         Builder2);
+          sbarow = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                          Builder2);
+        } else if (call.getArgOperand(1) == Builder2.getInt32(111)) {
+          sbatrans = Builder2.getInt32(112);
+          sacol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                         Builder2);
+          sbarow = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                          Builder2);
+        }
+        if (call.getArgOperand(2) == Builder2.getInt32(112)) {
+          sabtrans = Builder2.getInt32(111);
+          sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                          Builder2);
+        } else if (call.getArgOperand(2) == Builder2.getInt32(111)) {
+          sabtrans = Builder2.getInt32(112);
+          sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                          Builder2);
+        } else
+          assert(false && "Unhandled: Notify developers");
         SmallVector<Value *, 13> safuncargs = {
             lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(1)), Builder2),
-            Builder2.getInt32(112),
+            Builder2.getInt32(111),
+            sabtrans,
             lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(5)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(6)), Builder2),
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
+            lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(9)), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
-            dzeroval,
+            sabcol,
+            doneval,
             gutils->invertPointerM(call.getArgOperand(7), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
-                   Builder2)};
+            sacol};
         auto safunccall = Builder2.CreateCall(dfunc, safuncargs);
         SmallVector<Value *, 13> sbfuncargs = {
             lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
-            Builder2.getInt32(112),
+            sbatrans,
             Builder2.getInt32(111),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(5)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(6)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(7)), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(5)), Builder2),
+            sbarow,
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
-            dzeroval,
+            lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
+            doneval,
             gutils->invertPointerM(call.getArgOperand(9), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
                    Builder2)};
@@ -4138,10 +4163,8 @@ public:
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
             Builder2.getInt32(1)};
         auto scfunccall = Builder2.CreateCall(scfunc, scfuncargs);
-        // setDiffe(&call,
-        // Constant::getNullValue(call.getArgOperand(7)->getType()), Builder2);
-        return;
       }
+      return;
     }
   }
 
