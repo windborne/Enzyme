@@ -4091,7 +4091,7 @@ public:
             call.getArgOperand(7)->getType(), Builder2.getInt32Ty());
         auto oneval = Builder2.getInt32(1);
         auto doneval = Builder2.CreateBitCast(oneval, innerType);
-        Value *sabtrans, *sabcol, *sbatrans, *sblda, *saldc, *salda, *sbldb,
+        Value *sabtrans, *saldb, *sbatrans, *sblda, *saldc, *salda, *sbldb,
             *sbldc;
         if (call.getArgOperand(0) == Builder2.getInt32(102)) {
           salda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
@@ -4116,8 +4116,12 @@ public:
         if (call.getArgOperand(1) == Builder2.getInt32(112) ||
             call.getArgOperand(1) == Builder2.getInt32(113)) {
           sbatrans = Builder2.getInt32(111);
-          sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
-                         Builder2);
+          if (call.getArgOperand(0) == Builder2.getInt32(102))
+            sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                           Builder2);
+          else
+            sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                           Builder2);
         } else if (call.getArgOperand(1) == Builder2.getInt32(111)) {
           sbatrans = Builder2.getInt32(112);
           if (call.getArgOperand(0) == Builder2.getInt32(102))
@@ -4131,12 +4135,16 @@ public:
         if (call.getArgOperand(2) == Builder2.getInt32(112) ||
             call.getArgOperand(2) == Builder2.getInt32(113)) {
           sabtrans = Builder2.getInt32(111);
-          sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
-                          Builder2);
+          if (call.getArgOperand(0) == Builder2.getInt32(102))
+            saldb = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                           Builder2);
+          else
+            saldb = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                           Builder2);
         } else if (call.getArgOperand(2) == Builder2.getInt32(111)) {
           sabtrans = Builder2.getInt32(112);
-          sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
-                          Builder2);
+          saldb = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                         Builder2);
         } else
           assert(false && "Wrong value");
         SmallVector<Value *, 13> safuncargs = {
@@ -4150,7 +4158,7 @@ public:
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
             salda,
             lookup(gutils->getNewFromOriginal(call.getArgOperand(9)), Builder2),
-            sabcol,
+            saldb,
             doneval,
             gutils->invertPointerM(call.getArgOperand(7), Builder2),
             saldc};
