@@ -1416,6 +1416,7 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
                                       int idx, bool ignoreType, bool replace) {
   assert(malloc);
   assert(BuilderQ.GetInsertBlock()->getParent() == newFunc);
+  assert(isOriginalBlock(*BuilderQ.GetInsertBlock()));
   if (mode == DerivativeMode::ReverseModeCombined) {
     assert(!tape);
     return malloc;
@@ -1485,6 +1486,7 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
     if (auto found = findInMap(scopeMap, malloc)) {
       ctx = found->second;
     }
+    assert(isOriginalBlock(*ctx.Block));
 
     bool inLoop;
     if (ctx.ForceSingleIteration) {
