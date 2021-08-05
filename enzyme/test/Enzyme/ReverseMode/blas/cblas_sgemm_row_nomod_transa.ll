@@ -5,7 +5,7 @@
 ;extern float __enzyme_autodiff(void *, float *, float *, float *, float *,
 ;                               float *, float *, float, float);
 ;
-;void g(float *A, float *B, float *C, float alpha, float beta) {
+;void g(float *restrict A, float *restrict B, float *C, float alpha, float beta) {
 ;  cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 2, 4, 3, alpha, A, 2, B,
 ;              4, beta, C, 4);
 ;}
@@ -88,9 +88,9 @@ declare dso_local float @__enzyme_autodiff(i8*, float*, float*, float*, float*, 
 
 ;CHECK:define internal { float, float } @diffeg(float* %A, float* %"A'", float* %B, float* %"B'", float* %C, float* %"C'", float %alpha, float %beta) {
 ;CHECK-NEXT:entry:
-;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 112, i32 111, i32 2, i32 4, i32 3, float %alpha, float* %A, i32 2, float* %B, i32 4, float %beta, float* %C, i32 4)
-;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 111, i32 112, i32 2, i32 3, i32 4, float %alpha, float* %"C'", i32 4, float* %B, i32 4, float 0x36A0000000000000, float* %"A'", i32 3)
-;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 111, i32 111, i32 3, i32 4, i32 2, float %alpha, float* %A, i32 2, float* %"C'", i32 4, float 0x36A0000000000000, float* %"B'", i32 4)
+;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 112, i32 111, i32 2, i32 4, i32 3, float %alpha, float* nocapture readonly %A, i32 2, float* nocapture readonly %B, i32 4, float %beta, float* %C, i32 4)
+;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 111, i32 112, i32 2, i32 3, i32 4, float %alpha, float* nocapture readonly %"C'", i32 4, float* nocapture readonly %B, i32 4, float 0x36A0000000000000, float* %"A'", i32 3)
+;CHECK-NEXT:  call void @cblas_sgemm(i32 101, i32 111, i32 111, i32 3, i32 4, i32 2, float %alpha, float* nocapture readonly %A, i32 2, float* nocapture readonly %"C'", i32 4, float 0x36A0000000000000, float* %"B'", i32 4)
 ;CHECK-NEXT:  call void @cblas_sscal(i32 8, float %beta, float* %"C'", i32 1)
 ;CHECK-NEXT:  ret { float, float } zeroinitializer
 ;CHECK-NEXT:}
