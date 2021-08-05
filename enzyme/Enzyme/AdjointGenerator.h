@@ -4077,8 +4077,62 @@ public:
         scfuncname = "cblas_sscal";
       } else
         assert(false && "Unreachable");
+      auto in_arg = call.getCalledFunction()->arg_begin();
+      in_arg++;
+      in_arg++;
+      in_arg++;
+      in_arg++;
+      in_arg++;
+      in_arg++;
+      in_arg++;
+      Argument *Aarg = in_arg;
+      in_arg++;
+      in_arg++;
+      Argument *Barg = in_arg;
       auto aactive = !gutils->isConstantValue(call.getArgOperand(7));
       auto bactive = !gutils->isConstantValue(call.getArgOperand(9));
+      auto Acache = aactive && uncacheable_args.find(Aarg)->second;
+      auto Bcache = bactive && uncacheable_args.find(Barg)->second;
+      Type *castvals[2] = {call.getArgOperand(7)->getType(),
+                           call.getArgOperand(9)->getType()};
+      auto *cachetype = StructType::get(call.getContext(), ArrayRef(castvals));
+      Value *undefinit = UndefValue::get(cachetype);
+      Value *cacheval;
+      if ((Mode == DerivativeMode::ReverseModeCombined ||
+           Mode == DerivativeMode::ReverseModePrimal) &&
+          (Acache || Bcache)) {
+        Value *arg1, *arg2;
+        auto size = ConstantExpr::getSizeOf(innerType);
+        if (Acache) {
+          auto Asize =
+              BuilderZ.CreateMul(call.getArgOperand(3), call.getArgOperand(5));
+          auto malins = CallInst::CreateMalloc(
+              gutils->getNewFromOriginal(&call), size->getType(), innerType,
+              size, Asize, nullptr, "");
+          arg1 =
+              BuilderZ.CreateBitCast(malins, call.getArgOperand(7)->getType());
+          BuilderZ.CreateMemCpy(arg1, 0, call.getArgOperand(7), 0, Asize);
+        }
+        if (Bcache) {
+          auto Bsize =
+              BuilderZ.CreateMul(call.getArgOperand(4), call.getArgOperand(5));
+          auto malins = CallInst::CreateMalloc(
+              gutils->getNewFromOriginal(&call), size->getType(), innerType,
+              size, Bsize, nullptr, "");
+          arg2 =
+              BuilderZ.CreateBitCast(malins, call.getArgOperand(9)->getType());
+          BuilderZ.CreateMemCpy(arg2, 0, call.getArgOperand(9), 0, Bsize);
+        }
+        if (Acache && Bcache) {
+          auto valins1 = BuilderZ.CreateInsertValue(undefinit, arg1, 0);
+          cacheval = BuilderZ.CreateInsertValue(valins1, arg2, 1);
+        } else if (Acache)
+          cacheval = arg1;
+        else if (Bcache)
+          cacheval = arg2;
+        gutils->cacheForReverse(BuilderZ, cacheval,
+                                getIndex(&call, CacheType::Tape));
+      }
       if (Mode == DerivativeMode::ReverseModeCombined ||
           Mode == DerivativeMode::ReverseModeGradient) {
         IRBuilder<> Builder2(call.getParent());
@@ -4095,6 +4149,30 @@ public:
         auto doneval = Builder2.CreateBitCast(oneval, innerType);
         Value *sabtrans, *saldb, *sbatrans, *sblda, *saldc, *salda, *sbldb,
             *sbldc;
+        Value *structarg1, *structarg2;
+        if (Acache || Bcache) {
+          if (Mode == DerivativeMode::ReverseModeGradient &&
+              (aactive || bactive)) {
+            cacheval = BuilderZ.CreatePHI(cachetype, 0);
+          }
+          cacheval =
+              lookup(gutils->cacheForReverse(BuilderZ, cacheval,
+                                             getIndex(&call, CacheType::Tape)),
+                     Builder2);
+          if (Acache && Bcache) {
+            structarg1 = BuilderZ.CreateExtractValue(cacheval, 0);
+            structarg2 = BuilderZ.CreateExtractValue(cacheval, 1);
+          } else if (Acache)
+            structarg1 = cacheval;
+          else if (Bcache)
+            structarg2 = cacheval;
+        }
+        if (!Acache)
+          structarg1 = lookup(gutils->getNewFromOriginal(call.getArgOperand(7)),
+                              Builder2);
+        if (!Bcache)
+          structarg2 = lookup(gutils->getNewFromOriginal(call.getArgOperand(9)),
+                              Builder2);
         if (call.getArgOperand(0) == Builder2.getInt32(102)) {
           if (aactive) {
             salda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
@@ -4123,6 +4201,7 @@ public:
           }
         } else
           assert(false && "Wrong value");
+        CallInst *safunccall, *sbfunccall;
         if (aactive) {
           if (call.getArgOperand(2) == Builder2.getInt32(112) ||
               call.getArgOperand(2) == Builder2.getInt32(113)) {
@@ -4154,13 +4233,12 @@ public:
                      Builder2),
               gutils->invertPointerM(call.getArgOperand(12), Builder2),
               salda,
-              lookup(gutils->getNewFromOriginal(call.getArgOperand(9)),
-                     Builder2),
+              structarg2,
               saldb,
               doneval,
               gutils->invertPointerM(call.getArgOperand(7), Builder2),
               saldc};
-          auto safunccall = Builder2.CreateCall(dfunc, safuncargs);
+          safunccall = Builder2.CreateCall(dfunc, safuncargs);
         }
         if (bactive) {
           if (call.getArgOperand(1) == Builder2.getInt32(112) ||
@@ -4195,15 +4273,14 @@ public:
                      Builder2),
               lookup(gutils->getNewFromOriginal(call.getArgOperand(6)),
                      Builder2),
-              lookup(gutils->getNewFromOriginal(call.getArgOperand(7)),
-                     Builder2),
+              structarg1,
               sblda,
               gutils->invertPointerM(call.getArgOperand(12), Builder2),
               sbldb,
               doneval,
               gutils->invertPointerM(call.getArgOperand(9), Builder2),
               sbldc};
-          auto sbfunccall = Builder2.CreateCall(dfunc, sbfuncargs);
+          sbfunccall = Builder2.CreateCall(dfunc, sbfuncargs);
         }
         auto scfunc = gutils->oldFunc->getParent()->getOrInsertFunction(
             scfuncname, Builder2.getVoidTy(), Builder2.getInt32Ty(),
@@ -4218,6 +4295,10 @@ public:
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
             Builder2.getInt32(1)};
         auto scfunccall = Builder2.CreateCall(scfunc, scfuncargs);
+        if (Acache)
+          CallInst::CreateFree(structarg1, safunccall->getNextNode());
+        if (Bcache)
+          CallInst::CreateFree(structarg2, sbfunccall->getNextNode());
       }
       return;
     }
