@@ -4094,7 +4094,8 @@ public:
         auto oneval = Builder2.getInt32(1);
         auto doneval = Builder2.CreateBitCast(oneval, innerType);
         Value *sabtrans, *sabcol, *sbatrans, *sacol, *sbarow;
-        if (call.getArgOperand(1) == Builder2.getInt32(112)) {
+        if (call.getArgOperand(1) == Builder2.getInt32(112) ||
+            call.getArgOperand(1) == Builder2.getInt32(113)) {
           sbatrans = Builder2.getInt32(111);
           sacol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
                          Builder2);
@@ -4107,7 +4108,8 @@ public:
           sbarow = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
                           Builder2);
         }
-        if (call.getArgOperand(2) == Builder2.getInt32(112)) {
+        if (call.getArgOperand(2) == Builder2.getInt32(112) ||
+            call.getArgOperand(2) == Builder2.getInt32(113)) {
           sabtrans = Builder2.getInt32(111);
           sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
                           Builder2);
