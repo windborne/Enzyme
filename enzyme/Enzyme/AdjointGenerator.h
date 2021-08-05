@@ -420,7 +420,8 @@ public:
           newip = gutils->invertPointerM(&I, BuilderZ);
           assert(newip->getType() == type);
 
-          if (Mode == DerivativeMode::ReverseModePrimal && can_modref && needShadow) {
+          if (Mode == DerivativeMode::ReverseModePrimal && can_modref &&
+              needShadow) {
             gutils->cacheForReverse(BuilderZ, newip,
                                     getIndex(&I, CacheType::Shadow));
           }
@@ -5063,7 +5064,7 @@ public:
 
 #if LLVM_VERSION_MAJOR >= 11
     if (auto alias = dyn_cast<GlobalAlias>(orig->getCalledOperand()))
-        called = dyn_cast<Function>(alias->getAliasee());
+      called = dyn_cast<Function>(alias->getAliasee());
 #endif
 
     StringRef funcName = "";
@@ -6233,7 +6234,8 @@ public:
         return;
       }
 
-      hasPDFree = true;
+      if (EnzymeFreeInternalAllocations)
+        hasPDFree = true;
 
       // TODO enable this if we need to free the memory
       // NOTE THAT TOPLEVEL IS THERE SIMPLY BECAUSE THAT WAS PREVIOUS ATTITUTE
@@ -6366,7 +6368,7 @@ public:
       // NOTE THAT TOPLEVEL IS THERE SIMPLY BECAUSE THAT WAS PREVIOUS ATTITUTE
       // TO FREE'ing
       if (Mode == DerivativeMode::ReverseModeGradient) {
-          eraseIfUnused(*orig, /*erase*/ true, /*check*/ false);
+        eraseIfUnused(*orig, /*erase*/ true, /*check*/ false);
       } else if (Mode != DerivativeMode::ReverseModeCombined) {
         // if (is_value_needed_in_reverse<Primal>(
         //        TR, gutils, orig, /*topLevel*/ Mode ==
