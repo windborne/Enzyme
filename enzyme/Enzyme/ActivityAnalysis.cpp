@@ -1155,7 +1155,7 @@ bool ActivityAnalyzer::isConstantValue(TypeResults &TR, Value *Val) {
           }
 
           if (CI->hasFnAttr("enzyme_inactive")) {
-            return true;
+            continue;
           }
 
           Function *F = CI->getCalledFunction();
@@ -1184,7 +1184,7 @@ bool ActivityAnalyzer::isConstantValue(TypeResults &TR, Value *Val) {
             }
             for (auto FuncName : KnownInactiveFunctionsStartingWith) {
               if (F->getName().startswith(FuncName)) {
-                return true;
+                continue;
               }
             }
 
