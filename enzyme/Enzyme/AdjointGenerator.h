@@ -2108,7 +2108,8 @@ public:
 
     if (!vd.isKnownPastPointer()) {
       if (looseTypeAnalysis) {
-        if (auto CI = dyn_cast<CastInst>(orig_dst)) {
+        for (auto val : {orig_dst, orig_src}) {
+        if (auto CI = dyn_cast<CastInst>(val)) {
           if (auto PT = dyn_cast<PointerType>(CI->getSrcTy())) {
             if (PT->getElementType()->isFPOrFPVectorTy()) {
               vd = TypeTree(ConcreteType(PT->getElementType()->getScalarType()))
@@ -2131,13 +2132,14 @@ public:
             }
           }
         }
-        if (auto gep = dyn_cast<GetElementPtrInst>(orig_dst)) {
+        if (auto gep = dyn_cast<GetElementPtrInst>(val)) {
           if (auto AT = dyn_cast<ArrayType>(gep->getSourceElementType())) {
             if (AT->getElementType()->isIntegerTy()) {
               vd = TypeTree(BaseType::Integer).Only(0);
               goto known;
             }
           }
+        }
         }
       }
       EmitFailure("CannotDeduceType", MTI.getDebugLoc(), &MTI,
@@ -3480,8 +3482,10 @@ public:
     // MPI send / recv can only send float/integers
     if (funcName == "MPI_Isend" || funcName == "MPI_Irecv") {
       Value *firstallocation = nullptr;
+      if (!gutils->isConstantInstruction(&call)) {
       if (Mode == DerivativeMode::ReverseModePrimal ||
           Mode == DerivativeMode::ReverseModeCombined) {
+        assert(!gutils->isConstantValue(call.getOperand(0)));
         assert(!gutils->isConstantValue(call.getOperand(6)));
         Value *d_req = gutils->invertPointerM(call.getOperand(6), BuilderZ);
 
@@ -3619,6 +3623,7 @@ public:
           auto val_arg =
               ConstantInt::get(Type::getInt8Ty(Builder2.getContext()), 0);
           auto volatile_arg = ConstantInt::getFalse(Builder2.getContext());
+          assert(!gutils->isConstantValue(call.getOperand(0)));
           auto dbuf = gutils->invertPointerM(call.getOperand(0), Builder2);
 #if LLVM_VERSION_MAJOR == 6
           auto align_arg =
@@ -3636,6 +3641,7 @@ public:
               nargs));
           memset->addParamAttr(0, Attribute::NonNull);
         } else if (funcName == "MPI_Isend") {
+          assert(!gutils->isConstantValue(call.getOperand(0)));
           Value *shadow = gutils->invertPointerM(call.getOperand(0), Builder2);
           if (Mode == DerivativeMode::ReverseModeCombined)
             firstallocation = lookup(firstallocation, Builder2);
@@ -3657,6 +3663,7 @@ public:
           }
         } else
           assert(0 && "illegal mpi");
+      }
       }
       if (Mode == DerivativeMode::ReverseModeGradient)
         eraseIfUnused(call, /*erase*/ true, /*check*/ false);
