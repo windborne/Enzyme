@@ -4081,8 +4081,6 @@ public:
           Mode == DerivativeMode::ReverseModeGradient) {
         IRBuilder<> Builder2(call.getParent());
         getReverseBuilder(Builder2);
-        assert(call.getArgOperand(0) == Builder2.getInt32(101) &&
-               "Unhandled Order");
         auto dfunc = gutils->oldFunc->getParent()->getOrInsertFunction(
             funcName, Builder2.getVoidTy(), Builder2.getInt32Ty(),
             Builder2.getInt32Ty(), Builder2.getInt32Ty(), Builder2.getInt32Ty(),
@@ -4093,21 +4091,43 @@ public:
             call.getArgOperand(7)->getType(), Builder2.getInt32Ty());
         auto oneval = Builder2.getInt32(1);
         auto doneval = Builder2.CreateBitCast(oneval, innerType);
-        Value *sabtrans, *sabcol, *sbatrans, *sacol, *sbarow;
+        Value *sabtrans, *sabcol, *sbatrans, *sblda, *saldc, *salda, *sbldb,
+            *sbldc;
+        if (call.getArgOperand(0) == Builder2.getInt32(102)) {
+          salda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                         Builder2);
+          saldc = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                         Builder2);
+          sbldb = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                         Builder2);
+          sbldc = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                         Builder2);
+        } else if (call.getArgOperand(0) == Builder2.getInt32(101)) {
+          salda = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                         Builder2);
+          saldc = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                         Builder2);
+          sbldb = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                         Builder2);
+          sbldc = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
+                         Builder2);
+        } else
+          assert(false && "Wrong value");
         if (call.getArgOperand(1) == Builder2.getInt32(112) ||
             call.getArgOperand(1) == Builder2.getInt32(113)) {
           sbatrans = Builder2.getInt32(111);
-          sacol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+          sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
                          Builder2);
-          sbarow = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
-                          Builder2);
         } else if (call.getArgOperand(1) == Builder2.getInt32(111)) {
           sbatrans = Builder2.getInt32(112);
-          sacol = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
-                         Builder2);
-          sbarow = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
-                          Builder2);
-        }
+          if (call.getArgOperand(0) == Builder2.getInt32(102))
+            sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(3)),
+                           Builder2);
+          else
+            sblda = lookup(gutils->getNewFromOriginal(call.getArgOperand(5)),
+                           Builder2);
+        } else
+          assert(false && "Wrong value");
         if (call.getArgOperand(2) == Builder2.getInt32(112) ||
             call.getArgOperand(2) == Builder2.getInt32(113)) {
           sabtrans = Builder2.getInt32(111);
@@ -4118,7 +4138,7 @@ public:
           sabcol = lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
                           Builder2);
         } else
-          assert(false && "Unhandled: Notify developers");
+          assert(false && "Wrong value");
         SmallVector<Value *, 13> safuncargs = {
             lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
             Builder2.getInt32(111),
@@ -4128,12 +4148,12 @@ public:
             lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(6)), Builder2),
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
+            salda,
             lookup(gutils->getNewFromOriginal(call.getArgOperand(9)), Builder2),
             sabcol,
             doneval,
             gutils->invertPointerM(call.getArgOperand(7), Builder2),
-            sacol};
+            saldc};
         auto safunccall = Builder2.CreateCall(dfunc, safuncargs);
         SmallVector<Value *, 13> sbfuncargs = {
             lookup(gutils->getNewFromOriginal(call.getArgOperand(0)), Builder2),
@@ -4144,13 +4164,12 @@ public:
             lookup(gutils->getNewFromOriginal(call.getArgOperand(3)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(6)), Builder2),
             lookup(gutils->getNewFromOriginal(call.getArgOperand(7)), Builder2),
-            sbarow,
+            sblda,
             gutils->invertPointerM(call.getArgOperand(12), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(4)), Builder2),
+            sbldb,
             doneval,
             gutils->invertPointerM(call.getArgOperand(9), Builder2),
-            lookup(gutils->getNewFromOriginal(call.getArgOperand(4)),
-                   Builder2)};
+            sbldc};
         auto sbfunccall = Builder2.CreateCall(dfunc, sbfuncargs);
         auto scfunc = gutils->oldFunc->getParent()->getOrInsertFunction(
             scfuncname, Builder2.getVoidTy(), Builder2.getInt32Ty(),
