@@ -3650,9 +3650,9 @@ public:
               firstallocation = lookup(firstallocation, Builder2);
             else {
               firstallocation =
-                  Builder2.CreatePHI(Type::getInt8PtrTy(call.getContext()), 0);
-              firstallocation = gutils->cacheForReverse(
-                  Builder2, firstallocation, getIndex(&call, CacheType::Tape));
+                  BuilderZ.CreatePHI(Type::getInt8PtrTy(call.getContext()), 0);
+              firstallocation = gutils->lookupM(gutils->cacheForReverse(
+                  BuilderZ, firstallocation, getIndex(&call, CacheType::Tape)), Builder2);
             }
 
             DifferentiableMemCopyFloats(call, call.getOperand(0),
@@ -5136,8 +5136,8 @@ public:
         if (Mode == DerivativeMode::ReverseModeGradient &&
             augmentedReturn->tapeIndices.find(std::make_pair(
                 orig, CacheType::Tape)) != augmentedReturn->tapeIndices.end()) {
-          tape = Builder2.CreatePHI(Type::getInt32Ty(orig->getContext()), 0);
-          tape = gutils->cacheForReverse(Builder2, tape,
+          tape = BuilderZ.CreatePHI(Type::getInt32Ty(orig->getContext()), 0);
+          tape = gutils->cacheForReverse(BuilderZ, tape,
                                          getIndex(orig, CacheType::Tape),
                                          /*ignoreType*/ true);
         }
