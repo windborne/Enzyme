@@ -3137,6 +3137,8 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
     // behavior and unwrap behavior for all replacements.
     std::vector<std::pair<Instruction *, Value *>> newIToNextI;
 
+    llvm::errs() << " pre cacheForReverse: " << *gutils->newFunc << "\n";
+
     for (const auto &m : mapping) {
       if (m.first.second == CacheType::Self && !isa<CallInst>(m.first.first) &&
           gutils->knownRecomputeHeuristic.count(m.first.first)) {
@@ -3152,8 +3154,10 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
           BuilderZ.SetInsertPoint(
               cast<Instruction>(newi)->getParent()->getFirstNonPHI());
         }
+        llvm::errs() << " caching from reverse: " << *m.first.first << " - " << *newi << " ";
         Value *nexti = gutils->cacheForReverse(
             BuilderZ, newi, m.second, /*ignoreType*/ false, /*replace*/ false);
+        llvm::errs() << " nexti: " << *nexti << "\n";
         newIToNextI.emplace_back(newi, nexti);
       }
     }

@@ -1775,6 +1775,7 @@ Value *GradientUtils::cacheForReverse(IRBuilder<> &BuilderQ, Value *malloc,
       }
       if (!ignoreType && replace)
         cast<Instruction>(malloc)->replaceAllUsesWith(ret);
+      llvm::errs() << " replacing malloc: " << *malloc << " with: " << *ret << "\n";
       ret->takeName(malloc);
       if (replace)
         erase(cast<Instruction>(malloc));
