@@ -36,7 +36,7 @@
 #include "GradientUtils.h"
 #include "LibraryFuncs.h"
 #include "TypeAnalysis/TBAA.h"
-
+#include <iostream>
 #define DEBUG_TYPE "enzyme"
 using namespace llvm;
 
@@ -3898,7 +3898,7 @@ public:
     IRBuilder<> BuilderZ(newCall);
     BuilderZ.setFastMathFlags(getFast());
     CallInst *orig = &call;
-    if ((funcName == "cblas_ddot" || funcName == "cblas_sdot")) {
+    if (funcName == "cblas_ddot" || funcName == "cblas_sdot") {
       Type *innerType;
       std::string dfuncName;
       if (funcName == "cblas_ddot") {
@@ -4091,8 +4091,18 @@ public:
       Argument *Barg = in_arg;
       auto aactive = !gutils->isConstantValue(call.getArgOperand(7));
       auto bactive = !gutils->isConstantValue(call.getArgOperand(9));
-      auto Acache = aactive && uncacheable_args.find(Aarg)->second;
-      auto Bcache = bactive && uncacheable_args.find(Barg)->second;
+      assert(uncacheable_args.find(Aarg) != uncacheable_args.end());
+      assert(uncacheable_args.find(Barg) != uncacheable_args.end());
+      auto Acache = bactive && uncacheable_args.find(Aarg)->second;
+      auto Bcache = aactive && uncacheable_args.find(Barg)->second;
+      std::cout << "aactive = " << aactive << std::endl;
+      std::cout << "bactive = " << bactive << std::endl;
+      std::cout << "Acache = " << Acache << std::endl;
+      std::cout << "Bcache = " << Bcache << std::endl;
+      std::cout << "A Overwritten = " << uncacheable_args.find(Aarg)->second << std::endl;
+      std::cout << "B overwritten = " << uncacheable_args.find(Barg)->second << std::endl;
+      for (auto pair: uncacheable_args)
+        llvm::errs() << *pair.first << " " << pair.second << "\n";
       Type *castvals[2] = {call.getArgOperand(7)->getType(),
                            call.getArgOperand(9)->getType()};
       auto *cachetype = StructType::get(call.getContext(), ArrayRef(castvals));
@@ -4111,7 +4121,11 @@ public:
               size, Asize, nullptr, "");
           arg1 =
               BuilderZ.CreateBitCast(malins, call.getArgOperand(7)->getType());
+#if LLVM_VERSION_MAJOR >= 10
+          BuilderZ.CreateMemCpy(arg1, MaybeAlign(), call.getArgOperand(7), MaybeAlign(), Asize);
+#else
           BuilderZ.CreateMemCpy(arg1, 0, call.getArgOperand(7), 0, Asize);
+#endif
         }
         if (Bcache) {
           auto Bsize =
@@ -4121,7 +4135,11 @@ public:
               size, Bsize, nullptr, "");
           arg2 =
               BuilderZ.CreateBitCast(malins, call.getArgOperand(9)->getType());
+#if LLVM_VERSION_MAJOR >= 10
+          BuilderZ.CreateMemCpy(arg2, MaybeAlign(), call.getArgOperand(9), MaybeAlign(), Bsize);
+#else
           BuilderZ.CreateMemCpy(arg2, 0, call.getArgOperand(9), 0, Bsize);
+#endif
         }
         if (Acache && Bcache) {
           auto valins1 = BuilderZ.CreateInsertValue(undefinit, arg1, 0);
