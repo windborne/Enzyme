@@ -1081,6 +1081,12 @@ public:
   }
 
   bool runOnModule(Module &M) override {
+    {
+      std::error_code EC;
+      llvm::raw_fd_ostream out("mod.ll", EC);
+      out << M;
+      out.close();
+    }
     Logic.clear();
 
     bool changed = false;
