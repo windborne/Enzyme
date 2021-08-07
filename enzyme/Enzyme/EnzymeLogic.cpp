@@ -949,7 +949,7 @@ void calculateUnusedValuesInFunction(
         }
         return UseReq::Recur;
       });
-#if 0
+#if 0 
   llvm::errs() << "unnecessaryValues of " << func.getName() << ": mode=" << to_string(mode) << "\n";
   for (auto a : unnecessaryValues) {
     llvm::errs() << *a << "\n";
