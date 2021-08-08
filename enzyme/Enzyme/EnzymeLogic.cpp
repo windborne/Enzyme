@@ -3137,8 +3137,6 @@ Function *EnzymeLogic::CreatePrimalAndGradient(
     // behavior and unwrap behavior for all replacements.
     std::vector<std::pair<Instruction *, Value *>> newIToNextI;
 
-    llvm::errs() << " pre cacheForReverse: " << *gutils->newFunc << "\n";
-
     for (const auto &m : mapping) {
       if (m.first.second == CacheType::Self && !isa<CallInst>(m.first.first) &&
           gutils->knownRecomputeHeuristic.count(m.first.first)) {
