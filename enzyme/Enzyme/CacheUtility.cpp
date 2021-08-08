@@ -127,7 +127,7 @@ void CacheUtility::erase(Instruction *I) {
 }
 
 /// Replace this instruction both in LLVM modules and any local data-structures
-void CacheUtility::replaceAWithB(Value *A, Value *B, bool storeInCache) {
+void CacheUtility::replaceAWithB(Value *A, Value *B, bool storeInCache) { 
   for (auto &ctx : loopContexts) {
     if (ctx.second.maxLimit == A) {
       ctx.second.maxLimit = B;
