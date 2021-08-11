@@ -1034,7 +1034,7 @@ bool ActivityAnalyzer::isConstantValue(TypeResults &TR, Value *Val) {
           // abide by those rules
           if (!isCertainPrintMallocOrFree(called) && called->empty() &&
               !hasMetadata(called, "enzyme_gradient") &&
-              !isa<IntrinsicInst>(op) && EnzymeEmptyFnInactive) {
+              !isa<IntrinsicInst>(op) && EnzymeEmptyFnInactive && called->getName() != "asin") {
             InsertConstantValue(TR, Val);
             insertConstantsFrom(TR, *UpHypothesis);
             return true;
@@ -1672,7 +1672,7 @@ bool ActivityAnalyzer::isInstructionInactiveFromOrigin(TypeResults &TR,
       // by those rules
       if (!isCertainPrintMallocOrFree(called) && called->empty() &&
           !hasMetadata(called, "enzyme_gradient") && !isa<IntrinsicInst>(op) &&
-          EnzymeEmptyFnInactive) {
+          EnzymeEmptyFnInactive && called->getName() != "asin") {
         if (EnzymePrintActivity)
           llvm::errs() << "constant(" << (int)directions << ") up-emptyconst "
                        << *inst << "\n";
