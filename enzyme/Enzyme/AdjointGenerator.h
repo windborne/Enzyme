@@ -6468,7 +6468,7 @@ public:
       }
 
       // TODO HANDLE FREE
-      llvm::errs() << "freeing without malloc " << *val << "\n";
+      //llvm::errs() << "freeing without malloc " << *val << "\n";
       eraseIfUnused(*orig, /*erase*/ true, /*check*/ false);
       return;
     }

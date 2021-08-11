@@ -1798,7 +1798,7 @@ void SelectOptimization(Function *F) {
 }
 void PreProcessCache::optimizeIntermediate(Function *F) {
   PromotePass().run(*F, FAM);
-  GVN().run(*F, FAM);
+  //GVN().run(*F, FAM);
   SROA().run(*F, FAM);
 
   if (EnzymeSelectOpt) {
